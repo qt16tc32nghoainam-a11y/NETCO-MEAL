@@ -38,6 +38,18 @@ npm run start   # node dist/server.cjs — phục vụ dist/ tĩnh + API Express
 
 - `npm run start` phục vụ các file đã build trong `dist/` đồng thời gắn cùng bộ API Express tại `/api/v1`.
 
+## Triển khai trên Vercel
+
+Trên Vercel, `server.ts` **không** được chạy (Vercel chỉ phục vụ bản build tĩnh của Vite trong thư mục `dist/`). Vì vậy API được đóng gói lại dưới dạng **Serverless Function**:
+
+- API chạy dưới dạng Serverless Function tại `api/index.ts`. File này tạo một app Express tối giản và gắn lại **chính** `apiRouter` từ `server/api.ts` (không nhân bản logic route) tại base `/api/v1`.
+- `vercel.json` cấu hình `rewrites`: mọi lời gọi `/api/v1/*` được chuyển tới function `api/index`; các đường dẫn còn lại (không thuộc `api/`) fallback về `index.html` để React SPA (định tuyến phía client, refresh trang) hoạt động.
+- Frontend được build bằng Vite (`vite build`) và phục vụ tĩnh từ `dist/`.
+
+> ⚠️ **Cảnh báo quan trọng về dữ liệu:** dữ liệu hiện được lưu **in-memory** trong `server/db.ts`. Trên Vercel serverless, mỗi lần gọi có thể chạy ở một instance khác nhau, nên dữ liệu **KHÔNG bền vững giữa các request**. Đăng nhập vẫn hoạt động vì seed users được nạp lại mỗi lần function khởi tạo, nhưng dữ liệu đặt cơm / tạo mới sẽ **mất** khi function cold-start hoặc scale. Để chạy thật (production), cần thay kho in-memory bằng một cơ sở dữ liệu thực.
+
+Lưu ý: script `npm run build` trong `package.json` vẫn giữ nguyên (build frontend + đóng gói `server.ts` bằng esbuild) để phục vụ chạy standalone/local (`npm run start`) và các nền tảng khác. Vercel chỉ dùng `buildCommand` là `vite build` khai báo trong `vercel.json`.
+
 ## Thông tin đăng nhập demo
 
 - **Quản trị viên:** tên đăng nhập `admin` / mật khẩu `admin`.
