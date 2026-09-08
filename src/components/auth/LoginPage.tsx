@@ -16,48 +16,60 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { User, UserRole } from '../../types';
+import { fetchApi } from '../../utils/api';
 
 interface LoginPageProps {
   allUsers: User[];
   onLoginSuccess: (user: User) => void;
 }
 
+// Mật khẩu mặc định cho bản demo: Quản trị viên dùng "admin", các tài khoản còn lại dùng "123456".
+const ADMIN_PASSWORD = 'admin';
+const DEFAULT_PASSWORD = '123456';
+
+interface LoginResponse {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
 export function LoginPage({ allUsers, onLoginSuccess }: LoginPageProps) {
   const [identifier, setIdentifier] = useState('tuan.hm@netcovn.com.vn');
-  const [password, setPassword] = useState('••••••••');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const doLogin = async (credential: string, pwd: string) => {
     setErrorMsg('');
     setIsLoading(true);
+    try {
+      const result = await fetchApi<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ credential: credential.trim(), password: pwd }),
+      });
+      onLoginSuccess(result.user);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Đăng nhập thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    setTimeout(() => {
-      const cleanInput = identifier.trim().toLowerCase();
-      // Match by email or employeeCode
-      const matchedUser = allUsers.find(
-        (u) =>
-          u.email.toLowerCase() === cleanInput ||
-          u.employeeCode.toLowerCase() === cleanInput ||
-          u.email.toLowerCase().startsWith(cleanInput)
-      );
-
-      if (matchedUser) {
-        setIsLoading(false);
-        onLoginSuccess(matchedUser);
-      } else {
-        setIsLoading(false);
-        setErrorMsg('Không tìm thấy tài khoản với email hoặc mã nhân viên này trong hệ thống NETCO (@netcovn.com.vn).');
-      }
-    }, 400);
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    void doLogin(identifier, password);
   };
 
   const handleQuickSelect = (user: User) => {
-    setIdentifier(user.email);
-    setPassword('••••••••');
-    setErrorMsg('');
-    onLoginSuccess(user);
+    // Điền sẵn thông tin đúng cho vai trò được chọn rồi đăng nhập qua backend
+    // (Quản trị viên: admin/admin, các vai trò khác: <email> / 123456).
+    const isAdmin = user.role === 'Administrator';
+    const credential = isAdmin ? 'admin' : user.email;
+    const pwd = isAdmin ? ADMIN_PASSWORD : DEFAULT_PASSWORD;
+    setIdentifier(credential);
+    setPassword(pwd);
+    void doLogin(credential, pwd);
   };
 
   const demoPersonas: {
@@ -163,7 +175,7 @@ export function LoginPage({ allUsers, onLoginSuccess }: LoginPageProps) {
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-white tracking-tight">Đăng nhập tài khoản</h2>
                 <p className="text-sm text-slate-400 mt-1">
-                  Nhập email doanh nghiệp <span className="text-blue-400 font-medium">@netcovn.com.vn</span> hoặc mã nhân viên để tiếp tục.
+                  Nhập tên đăng nhập <span className="text-blue-400 font-medium">admin</span>, email doanh nghiệp <span className="text-blue-400 font-medium">@netcovn.com.vn</span> hoặc mã nhân viên kèm mật khẩu để tiếp tục.
                 </p>
               </div>
 
@@ -185,7 +197,7 @@ export function LoginPage({ allUsers, onLoginSuccess }: LoginPageProps) {
                       type="text"
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="tuan.hm@netcovn.com.vn hoặc EMP001"
+                      placeholder="admin, tuan.hm@netcovn.com.vn hoặc EMP001"
                       className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
                       required
                     />
@@ -240,6 +252,23 @@ export function LoginPage({ allUsers, onLoginSuccess }: LoginPageProps) {
                   )}
                 </button>
               </form>
+
+              {/* Thông tin đăng nhập demo */}
+              <div className="mt-5 p-3.5 rounded-xl bg-blue-950/30 border border-blue-800/50 text-xs text-slate-300 space-y-1">
+                <div className="font-semibold text-blue-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Thông tin đăng nhập demo</span>
+                </div>
+                <p>
+                  Quản trị viên: tài khoản <span className="font-mono text-white">admin</span> / mật khẩu{' '}
+                  <span className="font-mono text-white">admin</span>.
+                </p>
+                <p>
+                  Người dùng khác: <span className="font-mono text-white">email</span> hoặc{' '}
+                  <span className="font-mono text-white">mã nhân viên</span> / mật khẩu{' '}
+                  <span className="font-mono text-white">123456</span>.
+                </p>
+              </div>
 
               {/* Note about IPC Screen */}
               <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">

@@ -57,7 +57,7 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
   const [isCreatingMenu, setIsCreatingMenu] = useState(false);
   const [isDishPickerOpen, setIsDishPickerOpen] = useState(false);
   const [newMenuDate, setNewMenuDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [newMenuShiftId, setNewMenuShiftId] = useState<string>('shift_lunch');
+  const [newMenuShiftId, setNewMenuShiftId] = useState<string>('shift_b');
   const [newMenuTitle, setNewMenuTitle] = useState('');
   const [newMenuPrice, setNewMenuPrice] = useState(45000);
   const [newMenuItems, setNewMenuItems] = useState<MenuItem[]>([]);
@@ -392,6 +392,11 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
                 <ChefHat className="w-4 h-4 text-amber-600" />
                 <span>Soạn Thảo Thực Đơn Mới (DRAFT)</span>
               </h4>
+
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                Mỗi ngày có thể có <strong>2 hoặc 3 thực đơn</strong> tùy Bếp tạo, tương ứng 3 ca cố định
+                (Ca A, Ca B, Ca C). Mỗi ca chỉ được tạo <strong>1 thực đơn</strong> cho mỗi ngày, tối đa 3 thực đơn/ngày.
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                 <div>

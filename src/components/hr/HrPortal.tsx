@@ -188,16 +188,16 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
     }
   };
 
-  // Manual Attendance Sync Trigger
+  // Lấy số lượng & danh sách nhân viên chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài (chỉ đọc)
   const handleSyncAttendance = async () => {
     try {
       setIsSyncing(true);
       await fetchApi('/attendance/sync', { method: 'POST' }, currentUser.id);
-      setMessage({ type: 'success', text: 'Đã hoàn tất đồng bộ máy chấm công ZKTeco và cập nhật đối soát suất ăn!' });
+      setMessage({ type: 'success', text: 'Đã lấy số lượng & danh sách nhân viên chấm công hôm nay từ hệ thống chấm công độc lập và cập nhật đối soát suất ăn!' });
       await loadData();
       if (onRefreshGlobal) onRefreshGlobal();
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Lỗi đồng bộ máy chấm công';
+      const errorMsg = err instanceof Error ? err.message : 'Lỗi khi lấy dữ liệu từ hệ thống chấm công độc lập';
       setMessage({ type: 'error', text: errorMsg });
     } finally {
       setIsSyncing(false);
@@ -219,7 +219,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
           method: 'POST',
           body: JSON.stringify({
             employeeCodes: empCodes,
-            reason: 'Hành chính GA đặt bổ sung khẩn cấp theo dữ liệu máy chấm công ZKTeco',
+            reason: 'Hành chính GA đặt bổ sung khẩn cấp theo dữ liệu từ hệ thống chấm công độc lập bên ngoài',
           }),
         },
         currentUser.id
@@ -750,10 +750,10 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
           <div className="flex flex-wrap items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-xs gap-3">
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Đối Soát Dữ Liệu Máy Chấm Công & Suất Ăn Doanh Nghiệp NETCO Meal
+                Đối Soát Dữ Liệu Chấm Công (Hệ Thống Độc Lập) & Suất Ăn Doanh Nghiệp NETCO Meal
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tự động so sánh số người quẹt thẻ/vân tay đi làm hôm nay với số suất cơm đã đặt và thực tế đã quét QR Check-in.
+                Lấy số lượng & danh sách nhân viên chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài, rồi so sánh với số suất cơm đã đặt và thực tế đã quét QR Check-in tại nhà ăn.
               </p>
             </div>
             <button
@@ -762,7 +762,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
               className="flex items-center gap-2 px-4 py-2 bg-[#002D72] hover:bg-[#001D4A] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:bg-slate-300"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng Bộ Máy Chấm Công ZKTeco'}</span>
+              <span>{isSyncing ? 'Đang lấy dữ liệu...' : 'Lấy Dữ Liệu Chấm Công Hôm Nay (Hệ Thống Độc Lập)'}</span>
             </button>
           </div>
 
@@ -770,11 +770,11 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
           {comparison && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Đi Làm (ZKTeco)</div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Chấm Công Hôm Nay</div>
                 <div className="text-2xl font-extrabold text-slate-900 mt-1">
                   {comparison.totalAttendance} <span className="text-xs font-semibold text-slate-500">nhân sự</span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Cổng L1, L2 & Văn phòng</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Nguồn: hệ thống chấm công độc lập</div>
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
@@ -802,7 +802,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-rose-200 bg-rose-50/30 shadow-xs">
-                <div className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Đặt Nhưng Chưa Quẹt Thẻ</div>
+                <div className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Đặt Nhưng Chưa Chấm Công</div>
                 <div className="text-2xl font-extrabold text-rose-600 mt-1">
                   {comparison.unattendedBookingCount} <span className="text-xs font-semibold text-slate-500">suất</span>
                 </div>
@@ -855,7 +855,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
-              <span>Lịch Sử Đồng Bộ ZKTeco ({syncRuns.length})</span>
+              <span>Lịch Sử Lấy Dữ Liệu Chấm Công ({syncRuns.length})</span>
             </button>
           </div>
 
@@ -1192,7 +1192,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
                             </span>
                           </td>
                           <td className="p-3.5 text-right font-medium text-rose-600">
-                            Chưa quẹt thẻ ZKTeco
+                            Chưa có dữ liệu chấm công
                           </td>
                         </tr>
                       ))
@@ -1207,7 +1207,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
           {attSubTab === 'sync-history' && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
               <h4 className="font-bold text-sm text-slate-900">
-                Nhật Ký Các Lần Đồng Bộ Máy Chấm Công ZKTeco
+                Nhật Ký Các Lần Lấy Dữ Liệu Từ Hệ Thống Chấm Công Độc Lập
               </h4>
               <div className="space-y-2">
                 {syncRuns.map((run) => (
@@ -1217,7 +1217,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
                   >
                     <div>
                       <div className="font-bold text-slate-900">
-                        Đồng bộ lúc: {new Date(run.syncedAt).toLocaleString('vi-VN')}
+                        Lấy dữ liệu lúc: {new Date(run.syncedAt).toLocaleString('vi-VN')}
                       </div>
                       <div className="text-slate-500 text-[11px] mt-0.5">
                         Thực hiện bởi: <strong>{run.triggeredBy}</strong>
@@ -1225,7 +1225,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-semibold text-slate-700">
-                        Ghi nhận: <strong>{run.recordsProcessed}</strong> bản ghi chấm công
+                        Đã lấy về: <strong>{run.totalProcessed}</strong> nhân viên chấm công
                       </span>
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                         {run.status}

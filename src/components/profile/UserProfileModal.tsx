@@ -567,7 +567,7 @@ export function UserProfileModal({ currentUser, onClose, onUpdateUser }: UserPro
                 <ul className="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
                   <li>Nhân viên cần đăng ký hoặc hủy suất ăn trước giờ cut-off của ca tương ứng (Ca trưa trước 09:30).</li>
                   <li>Nếu đăng ký nhưng không quét mã nhận cơm (No-show quá 3 lần/tháng), hệ thống sẽ gửi thông báo cảnh báo đến bộ phận HR.</li>
-                  <li>Hệ thống tự động đối soát với dữ liệu quẹt thẻ ra vào máy chấm công vân tay/khuôn mặt mỗi ngày.</li>
+                  <li>Hệ thống tự động lấy dữ liệu chấm công mỗi ngày từ hệ thống chấm công độc lập bên ngoài để đối soát (ứng dụng không tự ghi nhận chấm công).</li>
                 </ul>
               </div>
             </div>

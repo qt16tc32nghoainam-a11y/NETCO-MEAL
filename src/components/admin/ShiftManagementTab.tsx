@@ -233,6 +233,15 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
 
   return (
     <div className="space-y-6">
+      {/* Info Banner: ai được quản lý ca */}
+      <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 text-sm text-indigo-900 flex items-start gap-2.5">
+        <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+        <span>
+          <strong>Hành chính (GA)</strong> tạo ca ăn theo nhu cầu vận hành, không giới hạn số lượng ca.
+          Quản trị viên và Hành chính (GA) đều có quyền thêm, sửa, tạm ngưng hoặc xóa ca ăn.
+        </span>
+      </div>
+
       {/* Alert Banner */}
       {message && (
         <div
@@ -290,7 +299,7 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <input
           type="text"
-          placeholder="Tìm theo tên ca (Ca Sáng, Ca Trưa...) hoặc mã (SHIFT_LUNCH)..."
+          placeholder="Tìm theo tên ca (Ca A, Ca B...) hoặc mã (CA_A)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1 min-w-[260px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-indigo-500"
@@ -444,7 +453,7 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
                   <input
                     type="text"
                     required
-                    placeholder="VD: Ca Sáng / Ca Ăn Đêm"
+                    placeholder="VD: Ca A / Ca B"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500"
@@ -456,7 +465,7 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
                   <input
                     type="text"
                     required
-                    placeholder="VD: SHIFT_NIGHT"
+                    placeholder="VD: CA_A"
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value.toUpperCase())}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:border-indigo-500"

@@ -31,6 +31,7 @@ interface DayOption {
   isSelected: boolean;
   shiftId: string;
   menuId: string;
+  hasMenu: boolean; // ngày này có thực đơn đã công bố hay không
   selectedDishIds: string[];
   note: string;
   existingBooking?: Booking;
@@ -85,29 +86,41 @@ export function WeeklyMealBooking({
 
   // Initialize day configurations when workdays or menus change
   useEffect(() => {
-    const defaultShift = shifts.find((s) => s.id === 'shift_lunch') || shifts[0];
-    const defaultShiftId = defaultShift ? defaultShift.id : 'shift_lunch';
+    const defaultShift = shifts.find((s) => s.id === 'shift_b') || shifts[0];
+    const defaultShiftId = defaultShift ? defaultShift.id : 'shift_b';
 
     const configs: DayOption[] = workdays.map((w) => {
-      // Find published menu for this date
-      const matchedMenu =
-        menus.find((m) => m.date === w.dateStr && m.status === 'PUBLISHED') ||
-        menus[0];
+      // Mỗi ngày có thể có 2 hoặc 3 thực đơn (mỗi ca 1 thực đơn). Chỉ lấy các thực đơn
+      // đã công bố (PUBLISHED) ĐÚNG ngày này, không mượn thực đơn của ngày khác.
+      const publishedMenusForDay = menus.filter(
+        (m) => m.date === w.dateStr && m.status === 'PUBLISHED'
+      );
 
       // Check existing booking
       const existing = existingBookings.find(
         (b) => b.mealDate === w.dateStr && b.status !== 'CANCELLED'
       );
 
+      // Ưu tiên thực đơn theo ca đang chọn (ca mặc định hoặc ca của lượt đặt đã có),
+      // nếu ca đó không có thực đơn thì dùng thực đơn công bố đầu tiên của ngày.
+      const preferredShiftId = existing ? existing.shiftId : defaultShiftId;
+      const matchedMenu =
+        publishedMenusForDay.find((m) => m.shiftId === preferredShiftId) ||
+        publishedMenusForDay[0];
+
       const allDishIds = matchedMenu ? matchedMenu.items.map((i) => i.id) : [];
+      const hasMenu = Boolean(matchedMenu);
 
       return {
         dayOfWeekName: w.dayOfWeekName,
         dateStr: w.dateStr,
         formattedDate: w.formattedDate,
-        isSelected: existing ? true : true, // default checked
-        shiftId: existing ? existing.shiftId : defaultShiftId,
+        // Ngày chưa có thực đơn được công bố thì không tự chọn để tránh gửi lên máy chủ
+        // và bị từ chối; nhân viên vẫn có thể tự tick nếu muốn.
+        isSelected: hasMenu,
+        shiftId: existing ? existing.shiftId : matchedMenu ? matchedMenu.shiftId : defaultShiftId,
         menuId: matchedMenu ? matchedMenu.id : 'menu_default',
+        hasMenu,
         selectedDishIds: existing ? existing.selectedItemIds : allDishIds,
         note: existing ? existing.note || '' : '',
         existingBooking: existing,
@@ -285,7 +298,8 @@ export function WeeklyMealBooking({
       {/* 5 Workdays Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         {dayConfigs.map((day, idx) => {
-          const menu = menus.find((m) => m.id === day.menuId) || menus[0];
+          const menu = menus.find((m) => m.id === day.menuId);
+          const menuShift = shifts.find((s) => s.id === (menu ? menu.shiftId : day.shiftId));
           const hasExisting = Boolean(day.existingBooking);
 
           return (
@@ -336,15 +350,21 @@ export function WeeklyMealBooking({
                 )}
 
                 {/* Menu Preview */}
-                <div>
-                  <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
-                    {menu ? menu.title : 'Thực đơn tiêu chuẩn'}
+                {menu ? (
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
+                      {menu.title}
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{menuShift ? `${menuShift.name} (${menuShift.startTime} - ${menuShift.endTime})` : 'Thực đơn theo ca'}</span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>Ca Trưa (11:30 - 13:00)</span>
+                ) : (
+                  <div className="p-1.5 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 text-[10px] font-semibold">
+                    Ngày này chưa có thực đơn được công bố nên chưa thể đặt cơm.
                   </div>
-                </div>
+                )}
 
                 {/* Dishes checkbox list */}
                 {menu && menu.items && (

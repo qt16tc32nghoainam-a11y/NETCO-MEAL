@@ -47,6 +47,9 @@ export interface User {
   employeeCode: string;
   name: string;
   email: string;
+  // Mật khẩu chỉ dùng nội bộ ở backend (bản demo in-memory). KHÔNG BAO GIỜ trả về
+  // trường này trong các response API (được loại bỏ trước khi gửi cho client).
+  password?: string;
   role: UserRole;
   departmentId: string;
   departmentName?: string;
@@ -168,21 +171,28 @@ export interface Booking {
   qrNonceUsed?: string;
 }
 
+// NOTE: AttendanceRecord represents a record RETURNED BY an external, independent
+// time-attendance system (hệ thống chấm công độc lập). This app does NOT record
+// attendance itself; it only reads today's count + employee names via that external API.
+// machineId/deviceId are optional legacy device-source hints from the external system.
 export interface AttendanceRecord {
   id: string;
   employeeCode: string;
   employeeName: string;
   departmentName: string;
   date: string; // YYYY-MM-DD
-  checkInTime: string; // HH:mm:ss
+  checkInTime: string; // HH:mm:ss (thời điểm chấm công ghi nhận bởi hệ thống bên ngoài)
   checkOutTime?: string;
-  machineId: string;
-  deviceId: string;
+  machineId?: string; // Nguồn thiết bị (tùy chọn) do hệ thống chấm công bên ngoài cung cấp
+  deviceId?: string;  // Nguồn thiết bị (tùy chọn) do hệ thống chấm công bên ngoài cung cấp
 }
 
+// NOTE: AttendanceSyncRun records one PULL of today's attendance data from the
+// external independent attendance system (lần lấy dữ liệu từ hệ thống chấm công độc lập).
+// It never creates/records attendance in this app; it only logs the fetch result.
 export interface AttendanceSyncRun {
   id: string;
-  syncedAt: string;
+  syncedAt: string; // Thời điểm lấy dữ liệu từ hệ thống chấm công bên ngoài
   totalProcessed: number;
   matchedEmployees: number;
   discrepancyCount: number;
@@ -198,7 +208,7 @@ export interface UnbookedEmployee {
   departmentId: string;
   departmentName: string;
   checkInTime: string;
-  machineId: string;
+  machineId?: string; // Nguồn thiết bị (tùy chọn) từ hệ thống chấm công bên ngoài
   status: 'ATTENDED_NO_BOOKING';
   phone?: string;
   email?: string;
@@ -332,7 +342,7 @@ export interface FeatureFlags {
   enableBOMForecasting: boolean;         // Dự toán nhu cầu & Cân đối tồn kho Masan
   enableDepartmentBooking: boolean;      // Đặt cơm theo phòng ban
   enableGuestBooking: boolean;           // Đặt cơm cho khách VIP/đối tác
-  enableAttendanceSync: boolean;         // Đối soát máy chấm công ZKTeco & Suất ăn
+  enableAttendanceSync: boolean;         // Đối soát dữ liệu từ hệ thống chấm công độc lập bên ngoài & Suất ăn
   enableMasterDishCatalog: boolean;      // Ngân hàng món ăn chuẩn & Quy trình GA duyệt món
   enableKioskQrCheckin: boolean;         // Kiosk QR Check-in & Màn hình IPC
   enableInventoryAndSuppliers: boolean;  // Quản lý kho & Định mức nguyên vật liệu Masan

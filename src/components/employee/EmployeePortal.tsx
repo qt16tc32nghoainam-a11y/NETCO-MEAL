@@ -47,7 +47,7 @@ export function EmployeePortal({ currentUser, onRefreshGlobal }: EmployeePortalP
   const todayStr = new Date().toISOString().split('T')[0];
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [selectedShiftId, setSelectedShiftId] = useState<string>('shift_lunch');
+  const [selectedShiftId, setSelectedShiftId] = useState<string>('shift_b');
   const [selectedDishIds, setSelectedDishIds] = useState<string[]>([]);
   const [orderNote, setOrderNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

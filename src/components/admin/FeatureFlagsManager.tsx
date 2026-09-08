@@ -94,11 +94,11 @@ const FEATURE_DEFINITIONS: FeatureItemDef[] = [
   },
   {
     key: 'enableAttendanceSync',
-    title: 'Đối Soát Dữ Liệu Máy Chấm Công ZKTeco',
+    title: 'Đối Soát Với Hệ Thống Chấm Công Độc Lập',
     category: 'core',
     categoryLabel: 'Nghiệp Vụ Cốt Lõi',
     badge: 'CỐT LÕI',
-    description: 'Tự động đối chiếu số lượng quét vân tay/khuôn mặt từ máy ZKTeco với danh sách đặt cơm để phát hiện người đi làm quên đặt hoặc đặt mà không ăn.',
+    description: 'Lấy số lượng & danh sách nhân viên chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài (chỉ đọc qua API), rồi đối chiếu với danh sách đặt cơm để phát hiện người đi làm quên đặt hoặc đặt mà không ăn. Ứng dụng không tự ghi nhận chấm công.',
     impact: 'Áp dụng cho: Hành Chính GA, Nhân Sự HR',
     icon: Clock,
   },
