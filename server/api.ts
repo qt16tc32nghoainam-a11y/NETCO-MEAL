@@ -6,8 +6,6 @@ import {
   shifts,
   menus,
   bookings,
-  attendanceRecords,
-  attendanceSyncRuns,
   inventoryItems,
   inventoryTransactions,
   auditLogs,
@@ -28,17 +26,13 @@ import {
   MenuItem,
   Booking,
   QRTokenPayload,
-  AttendanceComparison,
-  UnbookedEmployee,
-  UnattendedBooking,
-  DepartmentAttendanceBreakdown,
   InventoryTransactionType,
   Department,
-  Shift,
   MasanPurchaseOrder,
   InventoryRequirementAnalysis,
   FeatureFlags,
 } from '../src/types';
+import { AttendanceClientError, fetchTodayAttendance } from './attendanceClient';
 
 export const apiRouter = Router();
 
@@ -72,6 +66,25 @@ function sendError(res: Response, code: string, message: string, details?: Recor
     },
     requestId: res.locals.requestId,
   });
+}
+
+function getMenuCatalogValidationError(menu: Menu): string | null {
+  if (menu.items.length < 2 || menu.items.length > 3) {
+    return 'Mỗi thực đơn phải có đúng 2 hoặc 3 món.';
+  }
+
+  const itemIds = menu.items.map((item) => item.id);
+  if (new Set(itemIds).size !== itemIds.length) {
+    return 'Các món trong thực đơn không được trùng nhau.';
+  }
+
+  const hasUnavailableDish = itemIds.some((itemId) => {
+    const dish = masterDishes.find((candidate) => candidate.id === itemId);
+    return !dish || (dish.status || 'APPROVED') !== 'APPROVED';
+  });
+  return hasUnavailableDish
+    ? 'Thực đơn có món không còn tồn tại hoặc chưa được GA phê duyệt.'
+    : null;
 }
 
 // Helper to extract actor from headers or body
@@ -206,7 +219,7 @@ apiRouter.get('/users/:id', (req, res) => {
       noShowCount,
       cancelledCount,
       confirmedCount,
-      attendanceRate: userBookings.length > 0 ? Math.round((checkedInCount / userBookings.length) * 100) : 100,
+      mealCheckinRate: userBookings.length > 0 ? Math.round((checkedInCount / userBookings.length) * 100) : 100,
     },
   });
 });
@@ -750,64 +763,15 @@ apiRouter.get('/shifts', (req, res) => {
   return sendSuccess(res, shiftsWithEligibility);
 });
 
-// Create Shift (POST /shifts)
-apiRouter.post('/shifts', (req, res) => {
-  const actor = getActorUser(req);
-  const {
-    name,
-    code,
-    startTime,
-    endTime,
-    cutoffOrderMinutesBefore,
-    cutoffCancelMinutesBefore,
-    checkinStartWindowMinutes,
-    checkinEndWindowMinutes,
-    isActive,
-    orderCutoffDisplay,
-    cancelCutoffDisplay,
-  } = req.body;
-
-  if (!name || !code || !startTime || !endTime) {
-    return sendError(res, 'VALIDATION_ERROR', 'Tên ca, mã ca, giờ bắt đầu và giờ kết thúc là bắt buộc.');
-  }
-
-  const existing = shifts.find((s) => s.code.toUpperCase() === code.trim().toUpperCase());
-  if (existing) {
-    return sendError(res, 'CODE_EXISTS', `Mã ca "${code}" đã tồn tại.`);
-  }
-
-  const newShift: Shift = {
-    id: generateId('shift'),
-    name: name.trim(),
-    code: code.trim().toUpperCase(),
-    startTime: startTime.trim(),
-    endTime: endTime.trim(),
-    cutoffOrderMinutesBefore: Number(cutoffOrderMinutesBefore) || 120,
-    cutoffCancelMinutesBefore: Number(cutoffCancelMinutesBefore) || 60,
-    checkinStartWindowMinutes: Number(checkinStartWindowMinutes) || 30,
-    checkinEndWindowMinutes: Number(checkinEndWindowMinutes) || 30,
-    isActive: isActive !== false,
-    orderCutoffDisplay: orderCutoffDisplay || `${cutoffOrderMinutesBefore || 120}p trước ca`,
-    cancelCutoffDisplay: cancelCutoffDisplay || `${cutoffCancelMinutesBefore || 60}p trước ca`,
-  };
-
-  shifts.push(newShift);
-
-  addAuditLog({
-    actorUserId: actor.id,
-    actorName: actor.name,
-    actorEmployeeCode: actor.employeeCode,
-    actorRole: actor.role,
-    action: 'SHIFT_CREATE',
-    resourceType: 'SHIFT',
-    resourceId: newShift.id,
-    newValue: `Tạo ca ăn mới: ${newShift.name} (${newShift.startTime} - ${newShift.endTime})`,
-    ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
-    userAgent: req.headers['user-agent'] || 'Unknown',
-    requestId: res.locals.requestId,
-  });
-
-  return sendSuccess(res, newShift, {}, 201);
+// Shift codes are fixed by business rule: only Ca A, Ca B and Ca C exist.
+apiRouter.post('/shifts', (_req, res) => {
+  return sendError(
+    res,
+    'FIXED_SHIFTS',
+    'Hệ thống chỉ sử dụng ba ca cố định: Ca A, Ca B và Ca C. Không thể tạo thêm ca.',
+    {},
+    405
+  );
 });
 
 // Update Shift (PATCH /shifts/:id)
@@ -821,8 +785,6 @@ apiRouter.patch('/shifts/:id', (req, res) => {
   }
 
   const {
-    name,
-    code,
     startTime,
     endTime,
     cutoffOrderMinutesBefore,
@@ -836,12 +798,6 @@ apiRouter.patch('/shifts/:id', (req, res) => {
 
   const oldValue = JSON.stringify(shift);
 
-  if (name !== undefined) shift.name = name.trim();
-  if (code !== undefined) {
-    const check = shifts.find((s) => s.id !== id && s.code.toUpperCase() === code.trim().toUpperCase());
-    if (check) return sendError(res, 'CODE_EXISTS', `Mã ca "${code}" đã tồn tại.`);
-    shift.code = code.trim().toUpperCase();
-  }
   if (startTime !== undefined) shift.startTime = startTime.trim();
   if (endTime !== undefined) shift.endTime = endTime.trim();
   if (cutoffOrderMinutesBefore !== undefined) shift.cutoffOrderMinutesBefore = Number(cutoffOrderMinutesBefore);
@@ -870,46 +826,15 @@ apiRouter.patch('/shifts/:id', (req, res) => {
   return sendSuccess(res, shift);
 });
 
-// Delete Shift (DELETE /shifts/:id)
-apiRouter.delete('/shifts/:id', (req, res) => {
-  const actor = getActorUser(req);
-  const { id } = req.params;
-  const shiftIndex = shifts.findIndex((s) => s.id === id);
-
-  if (shiftIndex === -1) {
-    return sendError(res, 'NOT_FOUND', 'Không tìm thấy ca ăn', {}, 404);
-  }
-
-  const shift = shifts[shiftIndex];
-  // Check if any booking uses this shift
-  const relatedBookings = bookings.filter((b) => b.shiftId === id && b.status !== 'CANCELLED');
-  if (relatedBookings.length > 0) {
-    return sendError(
-      res,
-      'SHIFT_HAS_BOOKINGS',
-      `Không thể xóa ca "${shift.name}" vì đang có ${relatedBookings.length} suất ăn đã đặt thuộc ca này. Bạn có thể chọn "Tạm ngưng" ca thay vì xóa.`,
-      {},
-      400
-    );
-  }
-
-  shifts.splice(shiftIndex, 1);
-
-  addAuditLog({
-    actorUserId: actor.id,
-    actorName: actor.name,
-    actorEmployeeCode: actor.employeeCode,
-    actorRole: actor.role,
-    action: 'SHIFT_DELETE',
-    resourceType: 'SHIFT',
-    resourceId: id,
-    oldValue: `Xóa ca ăn: ${shift.name} (${shift.code})`,
-    ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
-    userAgent: req.headers['user-agent'] || 'Unknown',
-    requestId: res.locals.requestId,
-  });
-
-  return sendSuccess(res, { message: 'Đã xóa ca ăn thành công', deletedShiftId: id });
+// Fixed shifts cannot be deleted.
+apiRouter.delete('/shifts/:id', (_req, res) => {
+  return sendError(
+    res,
+    'FIXED_SHIFTS',
+    'Ca A, Ca B và Ca C là mã ca cố định của hệ thống và không thể xóa.',
+    {},
+    405
+  );
 });
 
 apiRouter.get('/shifts/:id/booking-eligibility', (req, res) => {
@@ -1181,6 +1106,47 @@ apiRouter.post('/menus', (req, res) => {
   if (!date || !shiftId || !title || !items || !Array.isArray(items)) {
     return sendError(res, 'VALIDATION_ERROR', 'Vui lòng cung cấp đầy đủ ngày, ca, tiêu đề và danh sách món ăn.');
   }
+  if (items.length < 2 || items.length > 3) {
+    return sendError(
+      res,
+      'MENU_ITEM_COUNT_INVALID',
+      'Mỗi thực đơn phải có đúng 2 hoặc 3 món do bếp lựa chọn.'
+    );
+  }
+
+  const shift = shifts.find((item) => item.id === shiftId);
+  if (!shift) {
+    return sendError(res, 'SHIFT_NOT_FOUND', 'Ca áp dụng phải là một trong ba ca cố định: Ca A, Ca B hoặc Ca C.');
+  }
+
+  if (
+    !items.every(
+      (item: unknown) =>
+        typeof item === 'object' &&
+        item !== null &&
+        'id' in item &&
+        typeof item.id === 'string' &&
+        item.id.trim().length > 0
+    )
+  ) {
+    return sendError(res, 'VALIDATION_ERROR', 'Mỗi món trong thực đơn phải có ID hợp lệ.');
+  }
+
+  const itemIds = items.map((item: { id: string }) => item.id.trim());
+  if (new Set(itemIds).size !== itemIds.length) {
+    return sendError(res, 'DUPLICATE_MENU_ITEM', 'Các món trong thực đơn không được trùng nhau.');
+  }
+
+  const approvedItems = itemIds.map((itemId: string) =>
+    masterDishes.find((dish) => dish.id === itemId && (dish.status || 'APPROVED') === 'APPROVED')
+  );
+  if (approvedItems.some((item) => !item)) {
+    return sendError(
+      res,
+      'MENU_ITEM_NOT_APPROVED',
+      'Thực đơn chỉ được sử dụng các món đã được GA phê duyệt trong ngân hàng món.'
+    );
+  }
 
   const newMenu: Menu = {
     id: generateId('menu'),
@@ -1192,9 +1158,9 @@ apiRouter.post('/menus', (req, res) => {
     status: 'DRAFT',
     createdById: actor.id,
     createdByName: actor.name,
-    items: items.map((item: MenuItem) => ({
+    items: (approvedItems as MenuItem[]).map((item) => ({
       ...item,
-      id: item.id || generateId('dish'),
+      allergens: [...item.allergens],
     })),
   };
 
@@ -1220,6 +1186,11 @@ apiRouter.post('/menus/:id/submit', (req, res) => {
   const actor = getActorUser(req);
   const menu = menus.find((m) => m.id === req.params.id);
   if (!menu) return sendError(res, 'NOT_FOUND', 'Thực đơn không tồn tại', {}, 404);
+
+  const catalogError = getMenuCatalogValidationError(menu);
+  if (catalogError) {
+    return sendError(res, 'MENU_ITEMS_INVALID', catalogError);
+  }
 
   if (menu.status !== 'DRAFT' && menu.status !== 'REJECTED') {
     return sendError(res, 'INVALID_STATE', `Không thể gửi duyệt thực đơn đang ở trạng thái ${menu.status}`);
@@ -1253,6 +1224,11 @@ apiRouter.post('/menus/:id/approve', (req, res) => {
 
   const menu = menus.find((m) => m.id === req.params.id);
   if (!menu) return sendError(res, 'NOT_FOUND', 'Thực đơn không tồn tại', {}, 404);
+
+  const catalogError = getMenuCatalogValidationError(menu);
+  if (catalogError) {
+    return sendError(res, 'MENU_ITEMS_INVALID', catalogError);
+  }
 
   // Separation of duties rule: creator cannot approve their own menu
   if (menu.createdById === actor.id && actor.role !== 'Administrator') {
@@ -1329,6 +1305,11 @@ apiRouter.post('/menus/:id/publish', (req, res) => {
   const actor = getActorUser(req);
   const menu = menus.find((m) => m.id === req.params.id);
   if (!menu) return sendError(res, 'NOT_FOUND', 'Thực đơn không tồn tại', {}, 404);
+
+  const catalogError = getMenuCatalogValidationError(menu);
+  if (catalogError) {
+    return sendError(res, 'MENU_ITEMS_INVALID', catalogError);
+  }
 
   if (menu.status !== 'APPROVED') {
     return sendError(res, 'INVALID_STATE', 'Chỉ thực đơn đã được APPROVED mới có thể PUBLISH.');
@@ -1775,276 +1756,42 @@ apiRouter.delete('/bookings/:id', (req, res) => {
 });
 
 // ==========================================
-// 5. ATTENDANCE INTEGRATION & COMPARISON
+// 5. READ-ONLY EXTERNAL ATTENDANCE SUMMARY
 // ==========================================
 
-apiRouter.post('/attendance/sync', (req, res) => {
-  const actor = getActorUser(req);
-  if (!systemSettings.isAttendanceSyncEnabled) {
-    return sendError(res, 'SYNC_DISABLED', 'Tính năng đồng bộ máy chấm công hiện đang tắt trong Cấu hình hệ thống.');
+apiRouter.get('/attendance/today', async (req, res) => {
+  const actorId = req.headers['x-user-id'];
+  const actor = typeof actorId === 'string' ? users.find((user) => user.id === actorId) : undefined;
+  if (!actor) {
+    return sendError(res, 'UNAUTHORIZED', 'Vui lòng đăng nhập để xem dữ liệu chấm công.', {}, 401);
   }
 
-  const todayStr = getTodayDateString();
+  const actorRole = roles.find((role) => role.roleKey === actor.role || role.id === actor.role);
+  const effectivePermissions = new Set([
+    ...(actorRole?.permissions || []),
+    ...(actor.customPermissions || []),
+  ]);
+  if (!effectivePermissions.has('HR_ATTENDANCE_SUMMARY')) {
+    return sendError(res, 'FORBIDDEN', 'Bạn không có quyền xem dữ liệu chấm công.', {}, 403);
+  }
 
-  // Create sync run
-  const newSyncRun = {
-    id: generateId('sync'),
-    syncedAt: new Date().toISOString(),
-    totalProcessed: attendanceRecords.length,
-    matchedEmployees: attendanceRecords.length,
-    discrepancyCount: 1, // Demo disparity
-    status: 'SUCCESS' as const,
-    triggeredBy: `${actor.name} (${actor.role})`,
-    notes: 'Đồng bộ trực tiếp thành công từ máy chấm công vân tay & khuôn mặt ZKTeco FacePass.',
-  };
-
-  attendanceSyncRuns.unshift(newSyncRun);
-
-  addAuditLog({
-    actorUserId: actor.id,
-    actorName: actor.name,
-    action: 'ATTENDANCE_SYNC',
-    resourceType: 'ATTENDANCE',
-    resourceId: newSyncRun.id,
-    newValue: `Thực hiện đồng bộ dữ liệu chấm công: ${newSyncRun.totalProcessed} bản ghi`,
-    ipAddress: req.ip || '127.0.0.1',
-    userAgent: req.headers['user-agent'] || 'Unknown',
-    requestId: res.locals.requestId,
-  });
-
-  return sendSuccess(res, newSyncRun);
-});
-
-apiRouter.get('/attendance/comparison', (req, res) => {
-  const targetDate = (req.query.date as string) || getTodayDateString();
-  const targetShiftId = (req.query.shiftId as string) || 'shift_lunch';
-  const shiftObj = shifts.find((s) => s.id === targetShiftId) || shifts[0];
-
-  // Records for target date
-  const attForDate = attendanceRecords.filter((a) => a.date === targetDate);
-  const bookingsForDate = bookings.filter(
-    (b) => b.mealDate === targetDate && b.shiftId === targetShiftId && b.status !== 'CANCELLED'
-  );
-
-  const checkedInCount = bookingsForDate.filter((b) => b.status === 'CHECKED_IN').length;
-  const noShowCount = bookingsForDate.filter((b) => b.status === 'NO_SHOW').length;
-
-  // 1. Unbooked Employees: Clocked in today BUT have no booking for this date & shift
-  const unbookedEmployees: UnbookedEmployee[] = [];
-  for (const att of attForDate) {
-    const userObj = users.find(
-      (u) => u.employeeCode === att.employeeCode || u.name === att.employeeName
-    );
-    const hasBooking = bookingsForDate.some(
-      (b) => b.userEmployeeCode === att.employeeCode || (userObj && b.userId === userObj.id)
-    );
-
-    if (!hasBooking) {
-      unbookedEmployees.push({
-        employeeId: userObj?.id || att.employeeCode,
-        employeeCode: att.employeeCode,
-        name: att.employeeName,
-        departmentId: userObj?.departmentId || '',
-        departmentName: att.departmentName || userObj?.departmentName || 'Chưa phân bổ',
-        checkInTime: att.checkInTime,
-        machineId: att.machineId,
-        status: 'ATTENDED_NO_BOOKING',
-        phone: userObj?.phone,
-        email: userObj?.email,
-      });
+  try {
+    const summary = await fetchTodayAttendance();
+    return sendSuccess(res, summary);
+  } catch (error: unknown) {
+    if (error instanceof AttendanceClientError) {
+      return sendError(res, error.code, error.message, {}, error.statusCode);
     }
-  }
 
-  // 2. Unattended Bookings: Placed a booking BUT no clock-in recorded for today
-  const unattendedBookings: UnattendedBooking[] = [];
-  for (const b of bookingsForDate) {
-    if (b.isGuest) continue; // Skip guests
-    const hasClockIn = attForDate.some(
-      (a) => a.employeeCode === b.userEmployeeCode || a.employeeName === b.userName
-    );
-    if (!hasClockIn) {
-      unattendedBookings.push({
-        bookingId: b.id,
-        bookingCode: b.bookingCode,
-        employeeCode: b.userEmployeeCode,
-        name: b.userName,
-        departmentId: b.departmentId,
-        departmentName: b.departmentName,
-        mealDate: b.mealDate,
-        shiftName: b.shiftName,
-        status: 'BOOKED_NO_ATTENDANCE',
-      });
-    }
-  }
-
-  // 3. Department Breakdown
-  const departmentBreakdown: DepartmentAttendanceBreakdown[] = departments.map((dept) => {
-    const deptUsers = users.filter((u) => u.departmentId === dept.id);
-    const deptAttCount = attForDate.filter((a) => {
-      const u = users.find((usr) => usr.employeeCode === a.employeeCode);
-      return (u && u.departmentId === dept.id) || a.departmentName === dept.name;
-    }).length;
-
-    const deptBookedCount = bookingsForDate.filter((b) => b.departmentId === dept.id).length;
-    const deptUnbookedCount = unbookedEmployees.filter(
-      (ub) => ub.departmentId === dept.id || ub.departmentName === dept.name
-    ).length;
-    const deptUnattendedCount = unattendedBookings.filter(
-      (ua) => ua.departmentId === dept.id || ua.departmentName === dept.name
-    ).length;
-
-    const complianceRate =
-      deptAttCount > 0
-        ? Math.round((Math.max(0, deptAttCount - deptUnbookedCount) / deptAttCount) * 100)
-        : 100;
-
-    return {
-      departmentId: dept.id,
-      departmentName: dept.name,
-      totalEmployees: deptUsers.length,
-      clockedInCount: deptAttCount,
-      bookedCount: deptBookedCount,
-      unbookedCount: deptUnbookedCount,
-      unattendedCount: deptUnattendedCount,
-      complianceRate,
-    };
-  });
-
-  const comparison: AttendanceComparison = {
-    date: targetDate,
-    shiftId: targetShiftId,
-    shiftName: shiftObj?.name || 'Ca Trưa (Bữa Chính Công Sở)',
-    totalAttendance: attForDate.length,
-    totalBookings: bookingsForDate.length,
-    totalCheckedIn: checkedInCount,
-    noShowCount,
-    unbookedAttendanceCount: unbookedEmployees.length,
-    unattendedBookingCount: unattendedBookings.length,
-    discrepancyRatio:
-      bookingsForDate.length > 0
-        ? Math.round(
-            (Math.abs(attForDate.length - bookingsForDate.length) / bookingsForDate.length) * 100
-          )
-        : 0,
-    unbookedEmployees,
-    unattendedBookings,
-    departmentBreakdown,
-  };
-
-  return sendSuccess(res, {
-    comparison,
-    syncRuns: attendanceSyncRuns,
-    records: attForDate,
-  });
-});
-
-// Send reminders to unbooked employees
-apiRouter.post('/attendance/send-reminders', (req, res) => {
-  const actor = getActorUser(req);
-  const { employeeCodes } = req.body;
-  const count = Array.isArray(employeeCodes) ? employeeCodes.length : 1;
-
-  addAuditLog({
-    actorUserId: actor.id,
-    actorName: actor.name,
-    action: 'ATTENDANCE_SEND_REMINDER',
-    resourceType: 'ATTENDANCE',
-    resourceId: 'reminders',
-    newValue: `Gửi thông báo nhắc đặt cơm trưa cho ${count} nhân viên có mặt nhưng chưa đặt`,
-    ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
-    userAgent: req.headers['user-agent'] || 'Unknown',
-    requestId: res.locals.requestId,
-  });
-
-  return sendSuccess(res, {
-    success: true,
-    remindedCount: count,
-    message: `Đã gửi thông báo nhắc nhở đặt cơm tới ${count} nhân viên thành công qua Zalo/Email NETCO.`,
-  });
-});
-
-// GA Emergency bulk booking for unbooked employees
-apiRouter.post('/attendance/emergency-book-bulk', (req, res) => {
-  const actor = getActorUser(req);
-  if (actor.role !== 'HR_GA' && actor.role !== 'Administrator') {
+    console.error('Unexpected attendance integration error:', error);
     return sendError(
       res,
-      'FORBIDDEN',
-      'Chỉ Hành chính GA hoặc Admin mới có quyền đặt cơm bổ sung khẩn cấp',
+      'ATTENDANCE_UNAVAILABLE',
+      'Không thể lấy dữ liệu từ hệ thống chấm công độc lập.',
       {},
-      403
+      502
     );
   }
-
-  const { employeeCodes, mealDate, shiftId } = req.body;
-  const targetDate = mealDate || getTodayDateString();
-  const targetShiftId = shiftId || 'shift_lunch';
-  const menu =
-    menus.find((m) => m.date === targetDate && m.shiftId === targetShiftId) || menus[0];
-  const shift = shifts.find((s) => s.id === targetShiftId);
-
-  const createdBookings: Booking[] = [];
-
-  if (Array.isArray(employeeCodes)) {
-    for (const empCode of employeeCodes) {
-      const userObj = users.find((u) => u.employeeCode === empCode);
-      if (!userObj) continue;
-
-      // check duplicate
-      const exist = bookings.find(
-        (b) =>
-          b.userId === userObj.id &&
-          b.mealDate === targetDate &&
-          b.shiftId === targetShiftId &&
-          b.status !== 'CANCELLED'
-      );
-      if (exist) continue;
-
-      const newBooking: Booking = {
-        id: generateId('bk_emg'),
-        bookingCode: `BK-EMG-${Math.floor(1000 + Math.random() * 9000)}`,
-        userId: userObj.id,
-        userName: userObj.name,
-        userEmployeeCode: userObj.employeeCode,
-        departmentId: userObj.departmentId,
-        departmentName: userObj.departmentName,
-        mealDate: targetDate,
-        shiftId: targetShiftId,
-        shiftName: shift ? shift.name : targetShiftId,
-        menuId: menu ? menu.id : 'menu_today_lunch',
-        selectedItemIds: menu?.items.map((i) => i.id) || [],
-        selectedItemNames: menu?.items.map((i) => i.name) || [],
-        status: 'CONFIRMED',
-        isGuest: false,
-        note: `Hành chính GA đặt bổ sung khẩn cấp theo dữ liệu máy chấm công ZKTeco`,
-        priceSnapshot: menu ? menu.price : 45000,
-        bookedAt: new Date().toISOString(),
-        bookedByUserId: actor.id,
-        bookedByName: actor.name,
-      };
-
-      bookings.unshift(newBooking);
-      createdBookings.push(newBooking);
-    }
-  }
-
-  addAuditLog({
-    actorUserId: actor.id,
-    actorName: actor.name,
-    action: 'BOOKING_EMERGENCY_BULK',
-    resourceType: 'BOOKING',
-    resourceId: 'bulk_emergency',
-    newValue: `Hành chính GA đặt bổ sung khẩn cấp ${createdBookings.length} suất ăn cho nhân viên có mặt`,
-    ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
-    userAgent: req.headers['user-agent'] || 'Unknown',
-    requestId: res.locals.requestId,
-  });
-
-  return sendSuccess(res, {
-    createdCount: createdBookings.length,
-    bookings: createdBookings,
-    message: `Đã đặt bổ sung thành công ${createdBookings.length} suất ăn cho nhân viên có mặt chưa đặt. Bếp đã nhận được số lượng cập nhật.`,
-  });
 });
 
 // ==========================================
@@ -2591,7 +2338,7 @@ apiRouter.post('/qr/check-in', (req, res) => {
 // 7.4 IPC Screen Rotating QR Code (Displayed at Canteen IPC Screen)
 apiRouter.get('/qr/ipc-current-token', (req, res) => {
   const todayStr = getTodayDateString();
-  const activeShift = shifts.find((s) => s.isActive && s.id === 'shift_lunch') || shifts.find((s) => s.isActive) || shifts[0];
+  const activeShift = shifts.find((s) => s.isActive && s.id === 'shift_b') || shifts.find((s) => s.isActive) || shifts[0];
   
   const nowSec = Math.floor(Date.now() / 1000);
   const cycleSec = 30; // Rotate every 30 seconds
@@ -2824,14 +2571,16 @@ apiRouter.get('/reports/dashboard', (req, res) => {
 
   // 1. Kitchen metrics
   const todayBookings = bookings.filter((b) => b.mealDate === todayStr && b.status !== 'CANCELLED');
-  const totalMealsToCook = todayBookings.length;
+  const totalMealsToCook = todayBookings.reduce((sum, booking) => sum + (booking.isGuest ? booking.guestCount || 1 : 1), 0);
   const vegetarianMeals = todayBookings.filter((b) => b.selectedItemNames.some((n) => n.includes('Chay'))).length;
   const guestMeals = todayBookings.filter((b) => b.isGuest).reduce((acc, b) => acc + (b.guestCount || 1), 0);
 
   // Meals by shift
   const mealsByShift: Record<string, number> = {};
   for (const s of shifts) {
-    mealsByShift[s.name] = todayBookings.filter((b) => b.shiftId === s.id).length;
+    mealsByShift[s.name] = todayBookings
+      .filter((booking) => booking.shiftId === s.id)
+      .reduce((sum, booking) => sum + (booking.isGuest ? booking.guestCount || 1 : 1), 0);
   }
 
   // 2. HR & Admin financial metrics
@@ -2864,7 +2613,6 @@ apiRouter.get('/reports/dashboard', (req, res) => {
       totalBookings: todayBookings.length,
       totalCheckedIn,
       totalNoShow,
-      totalAttendance: attendanceRecords.filter((a) => a.date === todayStr).length,
       totalCostToday,
       costByDept,
       currency: 'VND',

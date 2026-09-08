@@ -166,12 +166,12 @@ export function Sidebar({
       ],
     },
     {
-      group: 'HÀNH CHÍNH GA & ĐỐI SOÁT',
+      group: 'HÀNH CHÍNH GA & BÁO CÁO',
       items: [
         {
           id: 'hr',
           label: 'Chấm Công & Chi Phí (GA)',
-          desc: 'Đối soát máy vân tay, báo cáo hạch toán',
+          desc: 'Xem chấm công read-only, báo cáo hạch toán',
           icon: UserCheck,
           crud: false,
         },

@@ -81,7 +81,7 @@ export function LoginPage({ allUsers, onLoginSuccess }: LoginPageProps) {
       roleKey: 'HR_GA',
       user: allUsers.find((u) => u.role === 'HR_GA') || allUsers.find((u) => u.employeeCode === 'GA001'),
       badgeColor: 'bg-red-50 text-red-700 border-red-200',
-      description: 'Duyệt thực đơn, đối soát chấm công, kiểm soát chi phí',
+      description: 'Duyệt thực đơn, xem tổng hợp chấm công read-only, kiểm soát chi phí',
       icon: UserCheck,
     },
     {

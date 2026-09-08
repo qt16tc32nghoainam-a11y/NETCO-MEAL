@@ -18,7 +18,7 @@ export type PermissionId =
   | 'KITCHEN_INVENTORY'
   | 'KIOSK_SCAN_QR'
   | 'KIOSK_MANUAL_CHECKIN'
-  | 'HR_RECONCILIATION'
+  | 'HR_ATTENDANCE_SUMMARY'
   | 'HR_EXPENSE_REPORTS'
   | 'SYSTEM_SETTINGS'
   | 'USER_MANAGEMENT'
@@ -69,10 +69,12 @@ export interface Department {
   totalEmployees?: number;
 }
 
+export type ShiftCode = 'Ca A' | 'Ca B' | 'Ca C';
+
 export interface Shift {
   id: string;
-  name: string;
-  code: string;
+  name: ShiftCode;
+  code: ShiftCode;
   startTime: string; // "11:30"
   endTime: string;   // "13:30"
   cutoffOrderMinutesBefore: number; // e.g. 120 minutes before startTime
@@ -168,79 +170,16 @@ export interface Booking {
   qrNonceUsed?: string;
 }
 
-export interface AttendanceRecord {
-  id: string;
-  employeeCode: string;
-  employeeName: string;
-  departmentName: string;
-  date: string; // YYYY-MM-DD
-  checkInTime: string; // HH:mm:ss
-  checkOutTime?: string;
-  machineId: string;
-  deviceId: string;
-}
-
-export interface AttendanceSyncRun {
-  id: string;
-  syncedAt: string;
-  totalProcessed: number;
-  matchedEmployees: number;
-  discrepancyCount: number;
-  status: 'SUCCESS' | 'FAILED' | 'PARTIAL';
-  triggeredBy: string;
-  notes?: string;
-}
-
-export interface UnbookedEmployee {
-  employeeId: string;
-  employeeCode: string;
+export interface TodayAttendanceEmployee {
+  employeeCode?: string;
   name: string;
-  departmentId: string;
-  departmentName: string;
-  checkInTime: string;
-  machineId: string;
-  status: 'ATTENDED_NO_BOOKING';
-  phone?: string;
-  email?: string;
 }
 
-export interface UnattendedBooking {
-  bookingId: string;
-  bookingCode: string;
-  employeeCode: string;
-  name: string;
-  departmentId?: string;
-  departmentName: string;
-  mealDate: string;
-  shiftName: string;
-  status: 'BOOKED_NO_ATTENDANCE';
-}
-
-export interface DepartmentAttendanceBreakdown {
-  departmentId: string;
-  departmentName: string;
-  totalEmployees: number;
-  clockedInCount: number;
-  bookedCount: number;
-  unbookedCount: number;
-  unattendedCount: number;
-  complianceRate: number;
-}
-
-export interface AttendanceComparison {
+export interface TodayAttendanceSummary {
   date: string;
-  shiftId: string;
-  shiftName: string;
-  totalAttendance: number;
-  totalBookings: number;
-  totalCheckedIn: number;
-  noShowCount: number;
-  unbookedAttendanceCount: number; // Nhân viên đi làm nhưng chưa đặt cơm
-  unattendedBookingCount: number;  // Đặt nhưng không có chấm công
-  discrepancyRatio: number; // percentage
-  unbookedEmployees?: UnbookedEmployee[];
-  unattendedBookings?: UnattendedBooking[];
-  departmentBreakdown?: DepartmentAttendanceBreakdown[];
+  total: number;
+  employees: TodayAttendanceEmployee[];
+  fetchedAt: string;
 }
 
 export type InventoryTransactionType =
@@ -332,7 +271,6 @@ export interface FeatureFlags {
   enableBOMForecasting: boolean;         // Dự toán nhu cầu & Cân đối tồn kho Masan
   enableDepartmentBooking: boolean;      // Đặt cơm theo phòng ban
   enableGuestBooking: boolean;           // Đặt cơm cho khách VIP/đối tác
-  enableAttendanceSync: boolean;         // Đối soát máy chấm công ZKTeco & Suất ăn
   enableMasterDishCatalog: boolean;      // Ngân hàng món ăn chuẩn & Quy trình GA duyệt món
   enableKioskQrCheckin: boolean;         // Kiosk QR Check-in & Màn hình IPC
   enableInventoryAndSuppliers: boolean;  // Quản lý kho & Định mức nguyên vật liệu Masan
@@ -387,7 +325,6 @@ export interface AuditLog {
 
 export interface SystemSettings {
   isQrCheckinEnabled: boolean;
-  isAttendanceSyncEnabled: boolean;
   allowNegativeInventory: boolean;
   allowAdminCutoffOverride: boolean;
   costBasis: 'BOOKED' | 'CHECKED_IN' | 'COOKED';

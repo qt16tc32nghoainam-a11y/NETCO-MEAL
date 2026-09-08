@@ -252,19 +252,6 @@ export function AdminPortal({ currentUser, onRefreshGlobal, initialTab = 'users'
               <label className="flex items-start gap-3 text-xs cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.isAttendanceSyncEnabled}
-                  onChange={(e) => setConfig({ ...config, isAttendanceSyncEnabled: e.target.checked })}
-                  className="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500"
-                />
-                <div>
-                  <div className="font-bold text-slate-800">Tự động đồng bộ máy chấm công định kỳ (Cronjob)</div>
-                  <div className="text-slate-500">Chạy định kỳ vào 09:30 và 14:00 hàng ngày đối soát nhân sự đi làm.</div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 text-xs cursor-pointer">
-                <input
-                  type="checkbox"
                   checked={config.allowNegativeInventory}
                   onChange={(e) => setConfig({ ...config, allowNegativeInventory: e.target.checked })}
                   className="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500"

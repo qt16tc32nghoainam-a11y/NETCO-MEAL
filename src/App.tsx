@@ -134,9 +134,9 @@ export default function App() {
         };
       case 'hr':
         return {
-          title: 'Đối Soát Chấm Công & Chi Phí (Hành Chính - GA)',
+          title: 'Tổng Hợp Chấm Công & Chi Phí (Hành Chính - GA)',
           category: 'HÀNH CHÍNH GA',
-          desc: 'Đồng bộ dữ liệu máy vân tay, so sánh suất ăn thực tế, xuất báo cáo chi phí suất ăn @netcovn',
+          desc: 'Xem read-only dữ liệu chấm công hôm nay từ hệ thống độc lập và xuất báo cáo chi phí suất ăn @netcovn',
           icon: FileSpreadsheet,
           hasCrud: false,
         };

@@ -35,7 +35,7 @@ interface UserProfileDetails extends User {
     noShowCount: number;
     cancelledCount: number;
     confirmedCount: number;
-    attendanceRate: number;
+    mealCheckinRate: number;
   };
 }
 
@@ -255,7 +255,7 @@ export function UserProfileModal({ currentUser, onClose, onUpdateUser }: UserPro
             }`}
           >
             <Clock className="w-4 h-4 text-amber-600" />
-            Lịch Sử Suất Ăn & Chấm Công
+            Lịch Sử Suất Ăn & Nhận Cơm
           </button>
         </div>
 
@@ -529,7 +529,7 @@ export function UserProfileModal({ currentUser, onClose, onUpdateUser }: UserPro
             </div>
           )}
 
-          {/* TAB 4: LỊCH SỬ ĂN UỐNG & CHẤM CÔNG */}
+          {/* TAB 4: LỊCH SỬ SUẤT ĂN & NHẬN CƠM */}
           {activeTab === 'stats' && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -548,7 +548,7 @@ export function UserProfileModal({ currentUser, onClose, onUpdateUser }: UserPro
                 <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
                   <span className="text-xs font-semibold text-amber-700 uppercase">Tỷ Lệ Check-in</span>
                   <div className="text-2xl font-black text-amber-800 mt-1">
-                    {profile.stats?.attendanceRate || 100}%
+                    {profile.stats?.mealCheckinRate ?? 100}%
                   </div>
                 </div>
                 <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-center">
@@ -567,7 +567,7 @@ export function UserProfileModal({ currentUser, onClose, onUpdateUser }: UserPro
                 <ul className="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
                   <li>Nhân viên cần đăng ký hoặc hủy suất ăn trước giờ cut-off của ca tương ứng (Ca trưa trước 09:30).</li>
                   <li>Nếu đăng ký nhưng không quét mã nhận cơm (No-show quá 3 lần/tháng), hệ thống sẽ gửi thông báo cảnh báo đến bộ phận HR.</li>
-                  <li>Hệ thống tự động đối soát với dữ liệu quẹt thẻ ra vào máy chấm công vân tay/khuôn mặt mỗi ngày.</li>
+                  <li>Dữ liệu nhận cơm được ghi nhận riêng bằng QR tại căng tin và không phải là dữ liệu chấm công.</li>
                 </ul>
               </div>
             </div>

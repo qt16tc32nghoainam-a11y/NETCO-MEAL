@@ -100,7 +100,7 @@ export function Header({
   const navigationTabs = [
     { id: 'employee', label: 'Đặt Suất & QR Ăn', icon: UtensilsCrossed },
     { id: 'kitchen', label: 'Bếp & Kho Thực Phẩm', icon: ChefHat },
-    { id: 'hr', label: 'Duyệt & Đối Soát Chấm Công', icon: UserCheck },
+    { id: 'hr', label: 'Duyệt & Xem Chấm Công', icon: UserCheck },
     { id: 'admin', label: 'Cấu Hình & Audit Log', icon: ShieldCheck },
     { id: 'kiosk', label: 'Kiosk Quét QR Căng Tin', icon: QrCode },
   ];

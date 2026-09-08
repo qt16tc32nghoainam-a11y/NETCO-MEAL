@@ -47,7 +47,7 @@ export function QrScannerKiosk({ currentUser, onRefreshGlobal }: QrScannerKioskP
   // Manual Check-in Modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualEmpCode, setManualEmpCode] = useState('');
-  const [manualShiftId, setManualShiftId] = useState('shift_lunch');
+  const [manualShiftId, setManualShiftId] = useState('shift_b');
   const [manualReason, setManualReason] = useState('Nhân viên quên mang điện thoại cá nhân');
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [allUsersList, setAllUsersList] = useState<User[]>([]);
