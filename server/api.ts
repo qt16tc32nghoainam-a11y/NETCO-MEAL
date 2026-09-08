@@ -1817,7 +1817,7 @@ apiRouter.post('/attendance/sync', (req, res) => {
 
 apiRouter.get('/attendance/comparison', (req, res) => {
   const targetDate = (req.query.date as string) || getTodayDateString();
-  const targetShiftId = (req.query.shiftId as string) || 'shift_lunch';
+  const targetShiftId = (req.query.shiftId as string) || 'shift_b';
   const shiftObj = shifts.find((s) => s.id === targetShiftId) || shifts[0];
 
   // Records for target date
@@ -1913,7 +1913,7 @@ apiRouter.get('/attendance/comparison', (req, res) => {
   const comparison: AttendanceComparison = {
     date: targetDate,
     shiftId: targetShiftId,
-    shiftName: shiftObj?.name || 'Ca Trưa (Bữa Chính Công Sở)',
+    shiftName: shiftObj?.name || 'Ca B',
     totalAttendance: attForDate.length,
     totalBookings: bookingsForDate.length,
     totalCheckedIn: checkedInCount,
@@ -1978,7 +1978,7 @@ apiRouter.post('/attendance/emergency-book-bulk', (req, res) => {
 
   const { employeeCodes, mealDate, shiftId } = req.body;
   const targetDate = mealDate || getTodayDateString();
-  const targetShiftId = shiftId || 'shift_lunch';
+  const targetShiftId = shiftId || 'shift_b';
   const menu =
     menus.find((m) => m.date === targetDate && m.shiftId === targetShiftId) || menus[0];
   const shift = shifts.find((s) => s.id === targetShiftId);
@@ -2591,7 +2591,7 @@ apiRouter.post('/qr/check-in', (req, res) => {
 // 7.4 IPC Screen Rotating QR Code (Displayed at Canteen IPC Screen)
 apiRouter.get('/qr/ipc-current-token', (req, res) => {
   const todayStr = getTodayDateString();
-  const activeShift = shifts.find((s) => s.isActive && s.id === 'shift_lunch') || shifts.find((s) => s.isActive) || shifts[0];
+  const activeShift = shifts.find((s) => s.isActive && s.id === 'shift_b') || shifts.find((s) => s.isActive) || shifts[0];
   
   const nowSec = Math.floor(Date.now() / 1000);
   const cycleSec = 30; // Rotate every 30 seconds

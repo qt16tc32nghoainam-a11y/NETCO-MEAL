@@ -493,11 +493,13 @@ export const users: User[] = [
 ];
 
 // Shifts Store with strict Cut-off parameters
+// Cố định 3 ca: Ca A (sáng), Ca B (trưa), Ca C (chiều/tối).
+// Việc có thêm ca tăng ca hay không sẽ được quyết định sau.
 export const shifts: Shift[] = [
   {
-    id: 'shift_breakfast',
-    name: 'Ca Sáng (Bữa Điểm Tâm)',
-    code: 'SHIFT_BREAKFAST',
+    id: 'shift_a',
+    name: 'Ca A',
+    code: 'CA_A',
     startTime: '06:30',
     endTime: '08:30',
     cutoffOrderMinutesBefore: 600, // Chốt đặt tối hôm trước (20:30)
@@ -509,9 +511,9 @@ export const shifts: Shift[] = [
     cancelCutoffDisplay: '04:30 (Cùng ngày)',
   },
   {
-    id: 'shift_lunch',
-    name: 'Ca Trưa (Bữa Chính Công Sở)',
-    code: 'SHIFT_LUNCH',
+    id: 'shift_b',
+    name: 'Ca B',
+    code: 'CA_B',
     startTime: '11:30',
     endTime: '13:30',
     cutoffOrderMinutesBefore: 120, // Chốt đặt 09:30
@@ -523,9 +525,9 @@ export const shifts: Shift[] = [
     cancelCutoffDisplay: '10:30',
   },
   {
-    id: 'shift_dinner',
-    name: 'Ca Tối (Bữa Chiều / Tăng Ca 1)',
-    code: 'SHIFT_DINNER',
+    id: 'shift_c',
+    name: 'Ca C',
+    code: 'CA_C',
     startTime: '17:30',
     endTime: '19:30',
     cutoffOrderMinutesBefore: 150, // Chốt đặt 15:00
@@ -535,34 +537,6 @@ export const shifts: Shift[] = [
     isActive: true,
     orderCutoffDisplay: '15:00',
     cancelCutoffDisplay: '16:00',
-  },
-  {
-    id: 'shift_night',
-    name: 'Ca Đêm (Xuyên Đêm)',
-    code: 'SHIFT_NIGHT',
-    startTime: '22:30',
-    endTime: '01:30',
-    cutoffOrderMinutesBefore: 150, // Chốt đặt 20:00
-    cutoffCancelMinutesBefore: 90,  // Chốt hủy 21:00
-    checkinStartWindowMinutes: 30,
-    checkinEndWindowMinutes: 30,
-    isActive: true,
-    orderCutoffDisplay: '20:00',
-    cancelCutoffDisplay: '21:00',
-  },
-  {
-    id: 'shift_overtime',
-    name: 'Ca Tăng Ca Đặc Biệt',
-    code: 'SHIFT_OVERTIME',
-    startTime: '19:30',
-    endTime: '21:00',
-    cutoffOrderMinutesBefore: 120,
-    cutoffCancelMinutesBefore: 60,
-    checkinStartWindowMinutes: 20,
-    checkinEndWindowMinutes: 20,
-    isActive: true,
-    orderCutoffDisplay: '17:30',
-    cancelCutoffDisplay: '18:30',
   },
 ];
 
@@ -721,7 +695,7 @@ export const menus: Menu[] = [
   {
     id: 'menu_today_lunch',
     date: today,
-    shiftId: 'shift_lunch',
+    shiftId: 'shift_b',
     title: 'Thực Đơn Trưa Cao Cấp - Bữa Cơm Doanh Nghiệp',
     description: 'Thực đơn tiêu chuẩn dinh dưỡng cân bằng năng lượng cho nhân viên văn phòng & sản xuất.',
     price: 45000,
@@ -737,7 +711,7 @@ export const menus: Menu[] = [
   {
     id: 'menu_today_dinner',
     date: today,
-    shiftId: 'shift_dinner',
+    shiftId: 'shift_c',
     title: 'Thực Đơn Chiều Tối Năng Lượng',
     description: 'Các món xào kho nóng sốt phục vụ ca làm việc buổi tối & tăng ca.',
     price: 40000,
@@ -753,7 +727,7 @@ export const menus: Menu[] = [
   {
     id: 'menu_tomorrow_lunch',
     date: tomorrow,
-    shiftId: 'shift_lunch',
+    shiftId: 'shift_b',
     title: 'Thực Đơn Trưa Ngày Mai - Ẩm Thực Vùng Miền',
     description: 'Thực đơn đã được HR/GA phê duyệt sẵn sàng để nhân viên đăng ký trước.',
     price: 45000,
@@ -769,7 +743,7 @@ export const menus: Menu[] = [
   {
     id: 'menu_upcoming_pending',
     date: dayAfter,
-    shiftId: 'shift_lunch',
+    shiftId: 'shift_b',
     title: 'Thực Đơn Trưa Ngày Kia (Đang Chờ HR Duyệt)',
     description: 'Thực đơn do Bếp Trưởng soạn thảo gửi ban Nhân Sự xét duyệt định mức dinh dưỡng.',
     price: 48000,
@@ -791,8 +765,8 @@ export const bookings: Booking[] = [
     departmentId: 'dept_it',
     departmentName: 'Phòng Công Nghệ Thông Tin',
     mealDate: today,
-    shiftId: 'shift_lunch',
-    shiftName: 'Ca Trưa (Bữa Chính Công Sở)',
+    shiftId: 'shift_b',
+    shiftName: 'Ca B',
     menuId: 'menu_today_lunch',
     selectedItemIds: ['dish_1', 'dish_5', 'dish_7'],
     selectedItemNames: ['Cơm Sườn Nướng Mật Ong Rừng', 'Canh Chua Cá Bông Lau Bạc Hà', 'Chè Long Nhãn Hạt Sen Tuyết Giáp'],
@@ -812,8 +786,8 @@ export const bookings: Booking[] = [
     departmentId: 'dept_it',
     departmentName: 'Phòng Công Nghệ Thông Tin',
     mealDate: today,
-    shiftId: 'shift_lunch',
-    shiftName: 'Ca Trưa (Bữa Chính Công Sở)',
+    shiftId: 'shift_b',
+    shiftName: 'Ca B',
     menuId: 'menu_today_lunch',
     selectedItemIds: ['dish_3', 'dish_6', 'dish_7'],
     selectedItemNames: ['Đậu Phụ Hữu Cơ Sốt Nấm Đông Cô (Món Chay)', 'Canh Hạt Sen Táo Đỏ Nấm Hương (Chay)', 'Chè Long Nhãn Hạt Sen Tuyết Giáp'],
@@ -835,8 +809,8 @@ export const bookings: Booking[] = [
     departmentId: 'dept_sales',
     departmentName: 'Phòng Kinh Doanh & Tiếp Thị',
     mealDate: today,
-    shiftId: 'shift_lunch',
-    shiftName: 'Ca Trưa (Bữa Chính Công Sở)',
+    shiftId: 'shift_b',
+    shiftName: 'Ca B',
     menuId: 'menu_today_lunch',
     selectedItemIds: ['dish_2', 'dish_5'],
     selectedItemNames: ['Cá Hồi Na Uy Áp Chảo Sốt Chanh Leo', 'Canh Chua Cá Bông Lau Bạc Hà'],
@@ -856,8 +830,8 @@ export const bookings: Booking[] = [
     departmentId: 'dept_it',
     departmentName: 'Phòng Công Nghệ Thông Tin',
     mealDate: today,
-    shiftId: 'shift_lunch',
-    shiftName: 'Ca Trưa (Bữa Chính Công Sở)',
+    shiftId: 'shift_b',
+    shiftName: 'Ca B',
     menuId: 'menu_today_lunch',
     selectedItemIds: ['dish_2', 'dish_7'],
     selectedItemNames: ['Cá Hồi Na Uy Áp Chảo Sốt Chanh Leo', 'Chè Long Nhãn Hạt Sen Tuyết Giáp'],
@@ -1582,7 +1556,7 @@ export const inventoryTransactions: InventoryTransaction[] = [
     inventoryItemName: 'Sườn Heo Sạch C.P Chuẩn VietGAP',
     type: 'OUT',
     quantity: -30,
-    reason: 'Xuất bếp nấu Ca Trưa cho 120 suất cơm sườn mật ong',
+    reason: 'Xuất bếp nấu Ca B cho 120 suất cơm sườn mật ong',
     performedByUserId: 'usr_chef',
     performedByName: 'Lê Văn Bếp Trưởng',
     createdAt: `${today}T08:30:00.000Z`,

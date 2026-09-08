@@ -47,7 +47,7 @@ export function QrScannerKiosk({ currentUser, onRefreshGlobal }: QrScannerKioskP
   // Manual Check-in Modal
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualEmpCode, setManualEmpCode] = useState('');
-  const [manualShiftId, setManualShiftId] = useState('shift_lunch');
+  const [manualShiftId, setManualShiftId] = useState('shift_b');
   const [manualReason, setManualReason] = useState('Nhân viên quên mang điện thoại cá nhân');
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [allUsersList, setAllUsersList] = useState<User[]>([]);
@@ -255,7 +255,7 @@ export function QrScannerKiosk({ currentUser, onRefreshGlobal }: QrScannerKioskP
             <p className="text-xs sm:text-sm text-slate-300 mt-0.5 flex items-center gap-2">
               <span>{ipcData?.canteenName || 'Nhà Ăn NETCO Post - Trụ Sở Chính'}</span>
               <span>•</span>
-              <span className="text-blue-400 font-semibold">{ipcData?.shift?.name || 'Ca Trưa (11:30 - 13:30)'}</span>
+              <span className="text-blue-400 font-semibold">{ipcData?.shift?.name || 'Ca B (11:30 - 13:30)'}</span>
             </p>
           </div>
         </div>

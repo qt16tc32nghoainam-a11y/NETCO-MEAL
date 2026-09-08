@@ -85,8 +85,8 @@ export function WeeklyMealBooking({
 
   // Initialize day configurations when workdays or menus change
   useEffect(() => {
-    const defaultShift = shifts.find((s) => s.id === 'shift_lunch') || shifts[0];
-    const defaultShiftId = defaultShift ? defaultShift.id : 'shift_lunch';
+    const defaultShift = shifts.find((s) => s.id === 'shift_b') || shifts[0];
+    const defaultShiftId = defaultShift ? defaultShift.id : 'shift_b';
 
     const configs: DayOption[] = workdays.map((w) => {
       // Find published menu for this date
@@ -286,6 +286,7 @@ export function WeeklyMealBooking({
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         {dayConfigs.map((day, idx) => {
           const menu = menus.find((m) => m.id === day.menuId) || menus[0];
+          const menuShift = shifts.find((s) => s.id === (menu ? menu.shiftId : day.shiftId));
           const hasExisting = Boolean(day.existingBooking);
 
           return (
@@ -342,7 +343,7 @@ export function WeeklyMealBooking({
                   </div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    <span>Ca Trưa (11:30 - 13:00)</span>
+                    <span>{menuShift ? `${menuShift.name} (${menuShift.startTime} - ${menuShift.endTime})` : 'Thực đơn theo ca'}</span>
                   </div>
                 </div>
 

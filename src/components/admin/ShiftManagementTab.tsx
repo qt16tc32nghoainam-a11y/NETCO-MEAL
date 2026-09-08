@@ -290,7 +290,7 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <input
           type="text"
-          placeholder="Tìm theo tên ca (Ca Sáng, Ca Trưa...) hoặc mã (SHIFT_LUNCH)..."
+          placeholder="Tìm theo tên ca (Ca A, Ca B...) hoặc mã (CA_A)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1 min-w-[260px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-indigo-500"
@@ -444,7 +444,7 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
                   <input
                     type="text"
                     required
-                    placeholder="VD: Ca Sáng / Ca Ăn Đêm"
+                    placeholder="VD: Ca A / Ca B"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-indigo-500"
@@ -456,7 +456,7 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
                   <input
                     type="text"
                     required
-                    placeholder="VD: SHIFT_NIGHT"
+                    placeholder="VD: CA_A"
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value.toUpperCase())}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:border-indigo-500"
