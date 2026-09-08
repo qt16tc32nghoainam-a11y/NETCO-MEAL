@@ -1,0 +1,10 @@
+{
+  "name": "NETCO Meal - Quản Lý Suất Ăn Doanh Nghiệp",
+  "description": "Hệ thống quản lý suất ăn doanh nghiệp NETCO Meal: đặt cơm đa ca, màn hình IPC quét QR tự động xác nhận, đối soát Hành chính GA, kho thực phẩm và phân quyền RBAC.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
