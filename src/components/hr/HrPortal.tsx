@@ -1225,7 +1225,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-semibold text-slate-700">
-                        Đã lấy về: <strong>{run.recordsProcessed}</strong> nhân viên chấm công
+                        Đã lấy về: <strong>{run.totalProcessed}</strong> nhân viên chấm công
                       </span>
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                         {run.status}

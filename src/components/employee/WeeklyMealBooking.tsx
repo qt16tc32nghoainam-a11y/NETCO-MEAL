@@ -31,6 +31,7 @@ interface DayOption {
   isSelected: boolean;
   shiftId: string;
   menuId: string;
+  hasMenu: boolean; // ngày này có thực đơn đã công bố hay không
   selectedDishIds: string[];
   note: string;
   existingBooking?: Booking;
@@ -108,14 +109,18 @@ export function WeeklyMealBooking({
         publishedMenusForDay[0];
 
       const allDishIds = matchedMenu ? matchedMenu.items.map((i) => i.id) : [];
+      const hasMenu = Boolean(matchedMenu);
 
       return {
         dayOfWeekName: w.dayOfWeekName,
         dateStr: w.dateStr,
         formattedDate: w.formattedDate,
-        isSelected: existing ? true : true, // default checked
+        // Ngày chưa có thực đơn được công bố thì không tự chọn để tránh gửi lên máy chủ
+        // và bị từ chối; nhân viên vẫn có thể tự tick nếu muốn.
+        isSelected: hasMenu,
         shiftId: existing ? existing.shiftId : matchedMenu ? matchedMenu.shiftId : defaultShiftId,
         menuId: matchedMenu ? matchedMenu.id : 'menu_default',
+        hasMenu,
         selectedDishIds: existing ? existing.selectedItemIds : allDishIds,
         note: existing ? existing.note || '' : '',
         existingBooking: existing,
@@ -345,15 +350,21 @@ export function WeeklyMealBooking({
                 )}
 
                 {/* Menu Preview */}
-                <div>
-                  <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
-                    {menu ? menu.title : 'Thực đơn tiêu chuẩn'}
+                {menu ? (
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
+                      {menu.title}
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{menuShift ? `${menuShift.name} (${menuShift.startTime} - ${menuShift.endTime})` : 'Thực đơn theo ca'}</span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{menuShift ? `${menuShift.name} (${menuShift.startTime} - ${menuShift.endTime})` : 'Thực đơn theo ca'}</span>
+                ) : (
+                  <div className="p-1.5 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 text-[10px] font-semibold">
+                    Ngày này chưa có thực đơn được công bố nên chưa thể đặt cơm.
                   </div>
-                </div>
+                )}
 
                 {/* Dishes checkbox list */}
                 {menu && menu.items && (

@@ -1184,15 +1184,19 @@ apiRouter.post('/menus', (req, res) => {
 
   // Guardrail: mỗi ngày chỉ có 3 ca cố định (Ca A, Ca B, Ca C) nên tối đa 3 thực đơn/ngày,
   // và mỗi ca chỉ được có 1 thực đơn. Bếp có thể tạo 2 hoặc 3 thực đơn tùy nhu cầu trong ngày.
-  const menusForDate = menus.filter((m) => m.date === date);
-  if (menusForDate.some((m) => m.shiftId === shiftId)) {
+  // Chỉ tính các thực đơn còn hiệu lực: thực đơn đã bị TỪ CHỐI (REJECTED) hoặc LƯU TRỮ (ARCHIVED)
+  // không chiếm chỗ của ca, để Bếp có thể tạo lại thực đơn mới cho ca đó trong cùng ngày.
+  const activeMenusForDate = menus.filter(
+    (m) => m.date === date && m.status !== 'REJECTED' && m.status !== 'ARCHIVED'
+  );
+  if (activeMenusForDate.some((m) => m.shiftId === shiftId)) {
     return sendError(
       res,
       'VALIDATION_ERROR',
       'Ca này đã có thực đơn trong ngày. Mỗi ca chỉ được tạo 1 thực đơn cho mỗi ngày.'
     );
   }
-  if (menusForDate.length >= 3) {
+  if (activeMenusForDate.length >= 3) {
     return sendError(
       res,
       'VALIDATION_ERROR',
@@ -1657,10 +1661,24 @@ apiRouter.post('/bookings/weekly', (req, res) => {
     }
 
     const shift = shifts.find((s) => s.id === shiftId) || shifts[0];
+    // Chỉ đặt cơm dựa trên thực đơn thực sự đã công bố (PUBLISHED) cho đúng ngày + ca.
+    // Không dùng menus[0] làm phương án dự phòng: nếu ngày/ca không có thực đơn thì phải
+    // báo lỗi rõ ràng để khớp với giao diện đặt cơm (hiển thị "chưa có thực đơn").
+    const explicitMenu = menuId
+      ? menus.find((m) => m.id === menuId && m.date === mealDate && m.shiftId === shiftId && m.status === 'PUBLISHED')
+      : undefined;
     const menu =
-      menus.find((m) => m.id === menuId) ||
-      menus.find((m) => m.date === mealDate && m.shiftId === shiftId && m.status === 'PUBLISHED') ||
-      menus[0];
+      explicitMenu ||
+      menus.find((m) => m.date === mealDate && m.shiftId === shiftId && m.status === 'PUBLISHED');
+
+    if (!menu) {
+      results.push({
+        mealDate,
+        success: false,
+        message: 'Ngày này chưa có thực đơn được công bố cho ca đã chọn nên chưa thể đặt cơm.',
+      });
+      continue;
+    }
 
     const menuItems = menu?.items || [];
     const chosenItems =
@@ -1675,7 +1693,7 @@ apiRouter.post('/bookings/weekly', (req, res) => {
 
     if (existing) {
       if (existing.status !== 'CHECKED_IN') {
-        existing.menuId = menu ? menu.id : existing.menuId;
+        existing.menuId = menu.id;
         existing.selectedItemIds = chosenItems.map((i) => i.id);
         existing.selectedItemNames = chosenItems.map((i) => i.name);
         existing.note = note ? `[Đặt theo tuần] ${note}` : existing.note;
@@ -1710,13 +1728,13 @@ apiRouter.post('/bookings/weekly', (req, res) => {
       mealDate,
       shiftId: shift.id,
       shiftName: shift.name,
-      menuId: menu ? menu.id : 'menu_default',
+      menuId: menu.id,
       selectedItemIds: chosenItems.map((i) => i.id),
       selectedItemNames: chosenItems.map((i) => i.name),
       status: 'CONFIRMED',
       isGuest: false,
       note: note ? `[Đặt theo tuần] ${note}` : `[Đặt theo tuần] ${chosenItems.length} món tiêu chuẩn`,
-      priceSnapshot: menu ? menu.price : 45000,
+      priceSnapshot: menu.price,
       bookedAt: new Date().toISOString(),
     };
 
