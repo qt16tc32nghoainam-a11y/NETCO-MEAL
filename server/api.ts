@@ -1182,6 +1182,24 @@ apiRouter.post('/menus', (req, res) => {
     return sendError(res, 'VALIDATION_ERROR', 'Vui lòng cung cấp đầy đủ ngày, ca, tiêu đề và danh sách món ăn.');
   }
 
+  // Guardrail: mỗi ngày chỉ có 3 ca cố định (Ca A, Ca B, Ca C) nên tối đa 3 thực đơn/ngày,
+  // và mỗi ca chỉ được có 1 thực đơn. Bếp có thể tạo 2 hoặc 3 thực đơn tùy nhu cầu trong ngày.
+  const menusForDate = menus.filter((m) => m.date === date);
+  if (menusForDate.some((m) => m.shiftId === shiftId)) {
+    return sendError(
+      res,
+      'VALIDATION_ERROR',
+      'Ca này đã có thực đơn trong ngày. Mỗi ca chỉ được tạo 1 thực đơn cho mỗi ngày.'
+    );
+  }
+  if (menusForDate.length >= 3) {
+    return sendError(
+      res,
+      'VALIDATION_ERROR',
+      'Mỗi ngày chỉ có tối đa 3 thực đơn theo 3 ca (Ca A, Ca B, Ca C).'
+    );
+  }
+
   const newMenu: Menu = {
     id: generateId('menu'),
     date,

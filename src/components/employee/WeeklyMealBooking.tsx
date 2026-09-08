@@ -89,15 +89,23 @@ export function WeeklyMealBooking({
     const defaultShiftId = defaultShift ? defaultShift.id : 'shift_b';
 
     const configs: DayOption[] = workdays.map((w) => {
-      // Find published menu for this date
-      const matchedMenu =
-        menus.find((m) => m.date === w.dateStr && m.status === 'PUBLISHED') ||
-        menus[0];
+      // Mỗi ngày có thể có 2 hoặc 3 thực đơn (mỗi ca 1 thực đơn). Chỉ lấy các thực đơn
+      // đã công bố (PUBLISHED) ĐÚNG ngày này, không mượn thực đơn của ngày khác.
+      const publishedMenusForDay = menus.filter(
+        (m) => m.date === w.dateStr && m.status === 'PUBLISHED'
+      );
 
       // Check existing booking
       const existing = existingBookings.find(
         (b) => b.mealDate === w.dateStr && b.status !== 'CANCELLED'
       );
+
+      // Ưu tiên thực đơn theo ca đang chọn (ca mặc định hoặc ca của lượt đặt đã có),
+      // nếu ca đó không có thực đơn thì dùng thực đơn công bố đầu tiên của ngày.
+      const preferredShiftId = existing ? existing.shiftId : defaultShiftId;
+      const matchedMenu =
+        publishedMenusForDay.find((m) => m.shiftId === preferredShiftId) ||
+        publishedMenusForDay[0];
 
       const allDishIds = matchedMenu ? matchedMenu.items.map((i) => i.id) : [];
 
@@ -106,7 +114,7 @@ export function WeeklyMealBooking({
         dateStr: w.dateStr,
         formattedDate: w.formattedDate,
         isSelected: existing ? true : true, // default checked
-        shiftId: existing ? existing.shiftId : defaultShiftId,
+        shiftId: existing ? existing.shiftId : matchedMenu ? matchedMenu.shiftId : defaultShiftId,
         menuId: matchedMenu ? matchedMenu.id : 'menu_default',
         selectedDishIds: existing ? existing.selectedItemIds : allDishIds,
         note: existing ? existing.note || '' : '',
@@ -285,7 +293,7 @@ export function WeeklyMealBooking({
       {/* 5 Workdays Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         {dayConfigs.map((day, idx) => {
-          const menu = menus.find((m) => m.id === day.menuId) || menus[0];
+          const menu = menus.find((m) => m.id === day.menuId);
           const menuShift = shifts.find((s) => s.id === (menu ? menu.shiftId : day.shiftId));
           const hasExisting = Boolean(day.existingBooking);
 

@@ -393,6 +393,11 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
                 <span>Soạn Thảo Thực Đơn Mới (DRAFT)</span>
               </h4>
 
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                Mỗi ngày có thể có <strong>2 hoặc 3 thực đơn</strong> tùy Bếp tạo, tương ứng 3 ca cố định
+                (Ca A, Ca B, Ca C). Mỗi ca chỉ được tạo <strong>1 thực đơn</strong> cho mỗi ngày, tối đa 3 thực đơn/ngày.
+              </p>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Ngày phục vụ:</label>

@@ -691,7 +691,25 @@ export const sampleDishes: MenuItem[] = [
 // Master Dish Catalog (Ngân hàng món ăn dùng chung chuẩn NETCO Meal)
 export const masterDishes: MenuItem[] = [...sampleDishes];
 
+// Thực đơn theo ngày: mỗi ngày có 2 hoặc 3 thực đơn tùy Bếp tạo, tối đa 3 ca (Ca A, Ca B, Ca C).
+// Hôm nay minh họa đủ 3 thực đơn (Ca A + Ca B + Ca C); ngày mai minh họa trường hợp 2 thực đơn.
 export const menus: Menu[] = [
+  {
+    id: 'menu_today_breakfast',
+    date: today,
+    shiftId: 'shift_a',
+    title: 'Thực Đơn Ca Sáng - Khởi Đầu Năng Lượng',
+    description: 'Thực đơn sáng nhẹ nhàng đủ dinh dưỡng cho ca làm việc buổi sáng (Ca A).',
+    price: 35000,
+    status: 'PUBLISHED',
+    createdById: 'usr_chef',
+    createdByName: 'Lê Văn Bếp Trưởng',
+    approvedById: 'usr_hr',
+    approvedByName: 'Trần Thị Nhân Sự',
+    approvedAt: `${today}T05:30:00.000Z`,
+    publishedAt: `${today}T05:35:00.000Z`,
+    items: [sampleDishes[3], sampleDishes[4], sampleDishes[6]],
+  },
   {
     id: 'menu_today_lunch',
     date: today,
