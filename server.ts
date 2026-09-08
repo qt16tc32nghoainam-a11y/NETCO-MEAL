@@ -5,7 +5,7 @@ import { apiRouter } from './server/api';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Global Middlewares
   app.use(express.json({ limit: '10mb' }));
@@ -39,7 +39,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Enterprise Meal System] Server listening on http://0.0.0.0:${PORT}`);
+    console.log(`[Enterprise Meal System] Server listening on http://0.0.0.0:${PORT} (PORT=${PORT})`);
   });
 }
 
