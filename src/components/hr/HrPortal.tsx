@@ -1,37 +1,22 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import {
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   FileSpreadsheet,
   Printer,
   RefreshCw,
   TrendingUp,
   DollarSign,
-  Building,
-  Users,
   Utensils,
   Calendar,
   AlertCircle,
-  Check,
-  Search,
-  Send,
-  Bell,
-  Phone,
-  Mail,
-  BookOpen,
-  ShieldCheck,
-  CheckSquare,
-  Square,
-  Clock,
-  ChevronRight
+  Check
 } from 'lucide-react';
 import {
   User,
   Menu,
   MenuItem,
-  AttendanceComparison,
-  AttendanceSyncRun,
+  TodayAttendanceSummary,
   Booking
 } from '../../types';
 import { fetchApi, formatVND } from '../../utils/api';
@@ -46,13 +31,14 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
   const [pendingMenus, setPendingMenus] = useState<Menu[]>([]);
   const [allDishes, setAllDishes] = useState<MenuItem[]>([]);
   const [dishFilterStatus, setDishFilterStatus] = useState<'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'>('PENDING_APPROVAL');
-  const [comparison, setComparison] = useState<AttendanceComparison | null>(null);
-  const [syncRuns, setSyncRuns] = useState<AttendanceSyncRun[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<TodayAttendanceSummary | null>(null);
+  const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
+  const [hasRequestedAttendance, setHasRequestedAttendance] = useState(false);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<{
     totalBookings: number;
     totalCheckedIn: number;
     totalNoShow: number;
-    totalAttendance: number;
     totalCostToday: number;
     costByDept: { departmentName: string; count: number; totalCost: number }[];
   } | null>(null);
@@ -66,29 +52,18 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
   const [rejectingDishId, setRejectingDishId] = useState<string | null>(null);
   const [rejectDishReason, setRejectDishReason] = useState<string>('');
 
-  // Attendance Sub-tab & Multi-Select
-  const [attSubTab, setAttSubTab] = useState<'unbooked' | 'departments' | 'unattended' | 'sync-history'>('unbooked');
-  const [selectedUnbookedEmpCodes, setSelectedUnbookedEmpCodes] = useState<string[]>([]);
-  const [unbookedSearch, setUnbookedSearch] = useState('');
-  const [unbookedDeptFilter, setUnbookedDeptFilter] = useState('ALL');
-
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [menusData, attData, repData, bksData, dishesData] = await Promise.all([
+      const [menusData, repData, bksData, dishesData] = await Promise.all([
         fetchApi<Menu[]>('/menus', {}, currentUser.id),
-        fetchApi<{ comparison: AttendanceComparison; syncRuns: AttendanceSyncRun[] }>('/attendance/comparison', {}, currentUser.id),
-        fetchApi<{ hr: { totalBookings: number; totalCheckedIn: number; totalNoShow: number; totalAttendance: number; totalCostToday: number; costByDept: { departmentName: string; count: number; totalCost: number }[] } }>('/reports/dashboard', {}, currentUser.id),
+        fetchApi<{ hr: { totalBookings: number; totalCheckedIn: number; totalNoShow: number; totalCostToday: number; costByDept: { departmentName: string; count: number; totalCost: number }[] } }>('/reports/dashboard', {}, currentUser.id),
         fetchApi<Booking[]>('/bookings', {}, currentUser.id),
         fetchApi<MenuItem[]>('/dishes', {}, currentUser.id),
       ]);
 
       setPendingMenus(menusData.filter((m) => m.status === 'PENDING_APPROVAL'));
-      setComparison(attData.comparison);
-      setSyncRuns(attData.syncRuns);
       setReportData(repData.hr);
       setAllBookings(bksData);
       setAllDishes(dishesData);
@@ -97,9 +72,31 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
     }
   }, [currentUser.id]);
 
+  const loadAttendance = useCallback(async () => {
+    setHasRequestedAttendance(true);
+    setIsAttendanceLoading(true);
+    setAttendanceError(null);
+
+    try {
+      const summary = await fetchApi<TodayAttendanceSummary>('/attendance/today', {}, currentUser.id);
+      setAttendanceSummary(summary);
+    } catch (err: unknown) {
+      setAttendanceSummary(null);
+      setAttendanceError(err instanceof Error ? err.message : 'Không thể tải dữ liệu chấm công hôm nay.');
+    } finally {
+      setIsAttendanceLoading(false);
+    }
+  }, [currentUser.id]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (hrTab === 'attendance' && !hasRequestedAttendance) {
+      loadAttendance();
+    }
+  }, [hasRequestedAttendance, hrTab, loadAttendance]);
 
   // Handle Menu Approval
   const handleApproveMenu = async (menuId: string) => {
@@ -188,88 +185,6 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
     }
   };
 
-  // Manual Attendance Sync Trigger
-  const handleSyncAttendance = async () => {
-    try {
-      setIsSyncing(true);
-      await fetchApi('/attendance/sync', { method: 'POST' }, currentUser.id);
-      setMessage({ type: 'success', text: 'Đã hoàn tất đồng bộ máy chấm công ZKTeco và cập nhật đối soát suất ăn!' });
-      await loadData();
-      if (onRefreshGlobal) onRefreshGlobal();
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Lỗi đồng bộ máy chấm công';
-      setMessage({ type: 'error', text: errorMsg });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Bulk Emergency Booking
-  const handleEmergencyBookBulk = async (empCodes: string[]) => {
-    if (empCodes.length === 0) {
-      setMessage({ type: 'error', text: 'Vui lòng chọn ít nhất 1 nhân viên để đặt cơm bổ sung!' });
-      return;
-    }
-
-    try {
-      setIsActionLoading(true);
-      const res = await fetchApi<{ message: string; bookedCount: number }>(
-        '/attendance/emergency-book-bulk',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            employeeCodes: empCodes,
-            reason: 'Hành chính GA đặt bổ sung khẩn cấp theo dữ liệu máy chấm công ZKTeco',
-          }),
-        },
-        currentUser.id
-      );
-
-      setMessage({
-        type: 'success',
-        text: `Đã hoàn tất đặt cơm bổ sung khẩn cấp cho ${res.bookedCount} nhân viên! Bếp đã nhận được số lượng suất ăn cập nhật.`,
-      });
-      setSelectedUnbookedEmpCodes([]);
-      await loadData();
-      if (onRefreshGlobal) onRefreshGlobal();
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Lỗi đặt cơm bổ sung';
-      setMessage({ type: 'error', text: errorMsg });
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  // Bulk Send Reminders
-  const handleSendReminders = async (empCodes: string[]) => {
-    if (empCodes.length === 0) {
-      setMessage({ type: 'error', text: 'Vui lòng chọn ít nhất 1 nhân viên để gửi nhắc nhở!' });
-      return;
-    }
-
-    try {
-      setIsActionLoading(true);
-      const res = await fetchApi<{ message: string; sentCount: number }>(
-        '/attendance/send-reminders',
-        {
-          method: 'POST',
-          body: JSON.stringify({ employeeCodes: empCodes }),
-        },
-        currentUser.id
-      );
-
-      setMessage({
-        type: 'success',
-        text: `Đã gửi thông báo nhắc nhở đặt cơm (Zalo / Email NETCO) tới ${res.sentCount} nhân viên thành công!`,
-      });
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Lỗi gửi nhắc nhở';
-      setMessage({ type: 'error', text: errorMsg });
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
   // Export CSV (Excel Compatible with UTF-8 BOM)
   const handleExportCSV = () => {
     const headers = [
@@ -313,27 +228,12 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
     window.print();
   };
 
-  // Filtered Unbooked Employees
-  const filteredUnbookedEmployees = (comparison?.unbookedEmployees || []).filter((emp) => {
-    const matchesSearch =
-      emp.name.toLowerCase().includes(unbookedSearch.toLowerCase()) ||
-      emp.employeeCode.toLowerCase().includes(unbookedSearch.toLowerCase()) ||
-      emp.phone.includes(unbookedSearch);
-    const matchesDept = unbookedDeptFilter === 'ALL' || emp.departmentName === unbookedDeptFilter;
-    return matchesSearch && matchesDept;
-  });
-
   // Filtered Dishes
   const pendingDishes = allDishes.filter((d) => (d.status || 'APPROVED') === 'PENDING_APPROVAL');
   const filteredDishes = allDishes.filter((d) => {
     if (dishFilterStatus === 'ALL') return true;
     return (d.status || 'APPROVED') === dishFilterStatus;
   });
-
-  // Unique departments from unbooked list
-  const departmentsList = Array.from(
-    new Set((comparison?.unbookedEmployees || []).map((e) => e.departmentName))
-  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -371,7 +271,7 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
             }`}
           >
             <TrendingUp className="w-4 h-4" />
-            <span>Đối Soát Chấm Công & Đặt Cơm</span>
+            <span>Chấm Công Hôm Nay</span>
           </button>
           <button
             onClick={() => setHrTab('finance')}
@@ -744,495 +644,97 @@ export function HrPortal({ currentUser, onRefreshGlobal }: HrPortalProps) {
         </div>
       )}
 
-      {/* TAB 3: ATTENDANCE RECONCILIATION & COMPARISON */}
+      {/* TAB 3: READ-ONLY ATTENDANCE SUMMARY */}
       {hrTab === 'attendance' && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-xs gap-3">
             <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Đối Soát Dữ Liệu Máy Chấm Công & Suất Ăn Doanh Nghiệp NETCO Meal
-              </h3>
+              <h3 className="text-base font-bold text-slate-900">Chấm Công Hôm Nay</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tự động so sánh số người quẹt thẻ/vân tay đi làm hôm nay với số suất cơm đã đặt và thực tế đã quét QR Check-in.
+                Dữ liệu read-only được lấy từ hệ thống chấm công độc lập. NETCO-MEAL không tạo, sửa hoặc đồng bộ bản ghi chấm công.
               </p>
             </div>
             <button
-              onClick={handleSyncAttendance}
-              disabled={isSyncing}
+              onClick={loadAttendance}
+              disabled={isAttendanceLoading}
               className="flex items-center gap-2 px-4 py-2 bg-[#002D72] hover:bg-[#001D4A] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:bg-slate-300"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng Bộ Máy Chấm Công ZKTeco'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isAttendanceLoading ? 'animate-spin' : ''}`} />
+              <span>{isAttendanceLoading ? 'Đang tải...' : 'Tải Lại'}</span>
             </button>
           </div>
 
-          {/* Metric Comparison Cards */}
-          {comparison && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Đi Làm (ZKTeco)</div>
-                <div className="text-2xl font-extrabold text-slate-900 mt-1">
-                  {comparison.totalAttendance} <span className="text-xs font-semibold text-slate-500">nhân sự</span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Cổng L1, L2 & Văn phòng</div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Suất Đã Đặt</div>
-                <div className="text-2xl font-extrabold text-[#002D72] mt-1">
-                  {comparison.totalBookings} <span className="text-xs font-semibold text-slate-500">suất</span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Cá nhân, phòng ban & khách</div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Đã Quét Check-in</div>
-                <div className="text-2xl font-extrabold text-emerald-600 mt-1">
-                  {comparison.totalCheckedIn} <span className="text-xs font-semibold text-slate-500">suất</span>
-                </div>
-                <div className="text-[11px] text-emerald-700 mt-0.5 font-medium">Đã dùng bữa thực tế</div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-xs">
-                <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Có Mặt Chưa Đặt Cơm</div>
-                <div className="text-2xl font-extrabold text-amber-600 mt-1">
-                  {comparison.unbookedAttendanceCount} <span className="text-xs font-semibold text-slate-500">người</span>
-                </div>
-                <div className="text-[11px] text-amber-800 mt-0.5 font-medium">Cần xử lý bổ sung</div>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-rose-200 bg-rose-50/30 shadow-xs">
-                <div className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Đặt Nhưng Chưa Quẹt Thẻ</div>
-                <div className="text-2xl font-extrabold text-rose-600 mt-1">
-                  {comparison.unattendedBookingCount} <span className="text-xs font-semibold text-slate-500">suất</span>
-                </div>
-                <div className="text-[11px] text-rose-800 mt-0.5 font-medium">Nguy cơ dư thừa suất</div>
-              </div>
+          {isAttendanceLoading && (
+            <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-xs text-center text-slate-500">
+              <RefreshCw className="w-7 h-7 mx-auto mb-3 animate-spin text-[#002D72]" />
+              <p className="text-sm font-semibold">Đang lấy dữ liệu từ hệ thống chấm công...</p>
             </div>
           )}
 
-          {/* Sub Navigation Tabs inside Attendance */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-            <button
-              onClick={() => setAttSubTab('unbooked')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                attSubTab === 'unbooked'
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>Nhân Viên Đi Làm Chưa Đặt Cơm ({comparison?.unbookedEmployees?.length || 0})</span>
-            </button>
-            <button
-              onClick={() => setAttSubTab('departments')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                attSubTab === 'departments'
-                  ? 'bg-[#002D72] text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5" />
-              <span>Đối Soát Theo Phòng Ban ({comparison?.departmentBreakdown?.length || 0})</span>
-            </button>
-            <button
-              onClick={() => setAttSubTab('unattended')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                attSubTab === 'unattended'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              <span>Đã Đặt Cơm Nhưng Vắng Mặt ({comparison?.unattendedBookings?.length || 0})</span>
-            </button>
-            <button
-              onClick={() => setAttSubTab('sync-history')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                attSubTab === 'sync-history'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>Lịch Sử Đồng Bộ ZKTeco ({syncRuns.length})</span>
-            </button>
-          </div>
-
-          {/* ATTENDANCE SUB-TAB 1: UNBOOKED EMPLOYEES */}
-          {attSubTab === 'unbooked' && (
-            <div className="space-y-4">
-              {/* Filter and Bulk Action Bar */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
-                    <div className="relative flex-1 min-w-[180px]">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        value={unbookedSearch}
-                        onChange={(e) => setUnbookedSearch(e.target.value)}
-                        placeholder="Tìm theo tên, mã NV, SĐT..."
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                    <select
-                      value={unbookedDeptFilter}
-                      onChange={(e) => setUnbookedDeptFilter(e.target.value)}
-                      className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
-                    >
-                      <option value="ALL">Tất cả phòng ban</option>
-                      {departmentsList.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Bulk Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        if (selectedUnbookedEmpCodes.length === filteredUnbookedEmployees.length) {
-                          setSelectedUnbookedEmpCodes([]);
-                        } else {
-                          setSelectedUnbookedEmpCodes(filteredUnbookedEmployees.map((e) => e.employeeCode));
-                        }
-                      }}
-                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-                    >
-                      {selectedUnbookedEmpCodes.length === filteredUnbookedEmployees.length && filteredUnbookedEmployees.length > 0
-                        ? 'Bỏ Chọn Tất Cả'
-                        : `Chọn Tất Cả (${filteredUnbookedEmployees.length})`}
-                    </button>
-
-                    <button
-                      onClick={() => handleSendReminders(selectedUnbookedEmpCodes)}
-                      disabled={selectedUnbookedEmpCodes.length === 0 || isActionLoading}
-                      className="flex items-center gap-1.5 px-3.5 py-2 bg-[#002D72] hover:bg-[#001D4A] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
-                    >
-                      <Bell className="w-3.5 h-3.5" />
-                      <span>Gửi Nhắc Nhở ({selectedUnbookedEmpCodes.length})</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleEmergencyBookBulk(selectedUnbookedEmpCodes)}
-                      disabled={selectedUnbookedEmpCodes.length === 0 || isActionLoading}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#D12630] hover:bg-[#B01F28] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>GA Đặt Bổ Sung Khẩn Cấp ({selectedUnbookedEmpCodes.length})</span>
-                    </button>
-                  </div>
-                </div>
-
-                {selectedUnbookedEmpCodes.length > 0 && (
-                  <div className="text-xs bg-amber-50 text-amber-900 px-3 py-2 rounded-xl border border-amber-200 flex items-center justify-between">
-                    <span>
-                      Đang chọn <strong>{selectedUnbookedEmpCodes.length}</strong> nhân sự chưa đặt cơm. Bạn có thể gửi tin nhắn nhắc nhở hoặc đặt bổ sung ngay lập tức để kịp chuyển số lượng sang bếp.
-                    </span>
-                    <button
-                      onClick={() => setSelectedUnbookedEmpCodes([])}
-                      className="text-amber-800 font-bold underline cursor-pointer ml-2"
-                    >
-                      Hủy chọn
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Table */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-600">
-                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
-                      <tr>
-                        <th className="p-3.5 w-10 text-center">
-                          <input
-                            type="checkbox"
-                            checked={
-                              filteredUnbookedEmployees.length > 0 &&
-                              selectedUnbookedEmpCodes.length === filteredUnbookedEmployees.length
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedUnbookedEmpCodes(filteredUnbookedEmployees.map((emp) => emp.employeeCode));
-                              } else {
-                                setSelectedUnbookedEmpCodes([]);
-                              }
-                            }}
-                            className="rounded text-[#002D72] focus:ring-[#002D72]"
-                          />
-                        </th>
-                        <th className="p-3.5">Mã NV & Họ Tên</th>
-                        <th className="p-3.5">Phòng Ban</th>
-                        <th className="p-3.5">Chấm Công Lúc</th>
-                        <th className="p-3.5">Cổng / Máy Quẹt</th>
-                        <th className="p-3.5">Thông Tin Liên Hệ</th>
-                        <th className="p-3.5 text-right">Thao Tác Nhanh</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredUnbookedEmployees.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="p-8 text-center text-slate-400">
-                            Tuyệt vời! Không có nhân viên nào có mặt mà chưa đặt cơm.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredUnbookedEmployees.map((emp) => {
-                          const isSelected = selectedUnbookedEmpCodes.includes(emp.employeeCode);
-                          return (
-                            <tr
-                              key={emp.employeeCode}
-                              className={`hover:bg-slate-50/80 transition ${
-                                isSelected ? 'bg-amber-50/40' : ''
-                              }`}
-                            >
-                              <td className="p-3.5 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {
-                                    if (isSelected) {
-                                      setSelectedUnbookedEmpCodes((prev) =>
-                                        prev.filter((c) => c !== emp.employeeCode)
-                                      );
-                                    } else {
-                                      setSelectedUnbookedEmpCodes((prev) => [...prev, emp.employeeCode]);
-                                    }
-                                  }}
-                                  className="rounded text-[#002D72] focus:ring-[#002D72]"
-                                />
-                              </td>
-                              <td className="p-3.5">
-                                <div className="font-bold text-slate-900">{emp.name}</div>
-                                <div className="text-[11px] font-mono text-slate-400">{emp.employeeCode}</div>
-                              </td>
-                              <td className="p-3.5">
-                                <span className="px-2 py-0.5 bg-slate-100 rounded-md text-slate-700 font-semibold text-[11px]">
-                                  {emp.departmentName}
-                                </span>
-                              </td>
-                              <td className="p-3.5 font-mono text-slate-700 font-bold">
-                                {emp.checkInTime}
-                              </td>
-                              <td className="p-3.5 text-slate-500 font-mono text-[11px]">
-                                {emp.machineId}
-                              </td>
-                              <td className="p-3.5">
-                                <div className="flex flex-col text-[11px]">
-                                  <span className="flex items-center gap-1 text-slate-700">
-                                    <Phone className="w-3 h-3 text-slate-400" />
-                                    {emp.phone}
-                                  </span>
-                                  <span className="flex items-center gap-1 text-slate-400">
-                                    <Mail className="w-3 h-3 text-slate-400" />
-                                    {emp.email}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="p-3.5 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => handleSendReminders([emp.employeeCode])}
-                                    title="Gửi tin nhắn nhắc nhở cá nhân"
-                                    className="px-2.5 py-1 text-[11px] font-bold text-[#002D72] bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer"
-                                  >
-                                    Nhắc Nhở
-                                  </button>
-                                  <button
-                                    onClick={() => handleEmergencyBookBulk([emp.employeeCode])}
-                                    title="Hành chính GA đặt bổ sung ngay cho nhân viên này"
-                                    className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#D12630] hover:bg-[#B01F28] rounded-lg transition cursor-pointer shadow-2xs"
-                                  >
-                                    Đặt Bổ Sung
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ATTENDANCE SUB-TAB 2: DEPARTMENT BREAKDOWN */}
-          {attSubTab === 'departments' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          {!isAttendanceLoading && attendanceError && (
+            <div className="bg-rose-50 p-6 rounded-2xl border border-rose-200 text-rose-900 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">
-                    Báo Cáo Tỷ Lệ Đặt Cơm & Tuân Thủ Theo Phòng Ban
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    So sánh số nhân sự có mặt chấm công vs số suất cơm đã đăng ký theo từng khối phòng ban.
-                  </p>
+                  <h4 className="text-sm font-bold">Không thể tải dữ liệu chấm công</h4>
+                  <p className="text-xs mt-1">{attendanceError}</p>
+                  <p className="text-[11px] text-rose-700 mt-1">Các tab thực đơn và tài chính vẫn hoạt động bình thường.</p>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5">Phòng Ban</th>
-                      <th className="p-3.5 text-center">Tổng Nhân Sự</th>
-                      <th className="p-3.5 text-center">Có Mặt Hôm Nay</th>
-                      <th className="p-3.5 text-center">Đã Đặt Cơm</th>
-                      <th className="p-3.5 text-center">Chưa Đặt Cơm</th>
-                      <th className="p-3.5 text-center">Đặt Nhưng Vắng</th>
-                      <th className="p-3.5">Tỷ Lệ Tuân Thủ (%)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {(comparison?.departmentBreakdown || []).map((dept) => (
-                      <tr key={dept.departmentId} className="hover:bg-slate-50/80 transition">
-                        <td className="p-3.5 font-bold text-slate-900">{dept.departmentName}</td>
-                        <td className="p-3.5 text-center font-semibold text-slate-600">{dept.totalEmployees}</td>
-                        <td className="p-3.5 text-center font-bold text-[#002D72]">{dept.clockedInCount}</td>
-                        <td className="p-3.5 text-center font-bold text-emerald-600">{dept.bookedCount}</td>
-                        <td className="p-3.5 text-center">
-                          {dept.unbookedCount > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[11px]">
-                              {dept.unbookedCount} người
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 font-semibold">0</span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-center">
-                          {dept.unattendedCount > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[11px]">
-                              {dept.unattendedCount} suất
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 font-semibold">0</span>
-                          )}
-                        </td>
-                        <td className="p-3.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${
-                                  dept.complianceRate >= 90
-                                    ? 'bg-emerald-500'
-                                    : dept.complianceRate >= 70
-                                    ? 'bg-amber-500'
-                                    : 'bg-rose-500'
-                                }`}
-                                style={{ width: `${dept.complianceRate}%` }}
-                              />
-                            </div>
-                            <span className="font-mono font-bold text-slate-800">{dept.complianceRate}%</span>
+              <button
+                onClick={loadAttendance}
+                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Thử Lại
+              </button>
+            </div>
+          )}
+
+          {!isAttendanceLoading && attendanceSummary && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Chấm Công Hôm Nay</div>
+                <div className="text-4xl font-extrabold text-[#002D72] mt-2">
+                  {attendanceSummary.total}
+                  <span className="text-sm font-semibold text-slate-500 ml-2">nhân viên</span>
+                </div>
+                <div className="mt-4 space-y-1 text-xs text-slate-500">
+                  <div>Ngày: <strong className="text-slate-700">{attendanceSummary.date}</strong></div>
+                  <div>
+                    Cập nhật lúc:{' '}
+                    <strong className="text-slate-700">
+                      {new Date(attendanceSummary.fetchedAt).toLocaleString('vi-VN')}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="p-5 border-b border-slate-100">
+                  <h4 className="text-sm font-bold text-slate-900">Danh Sách Nhân Viên Đã Chấm Công</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Chỉ hiển thị tên và mã nhân viên nếu hệ thống độc lập cung cấp.</p>
+                </div>
+                {attendanceSummary.employees.length === 0 ? (
+                  <div className="p-10 text-center text-sm text-slate-400">Chưa có nhân viên chấm công hôm nay.</div>
+                ) : (
+                  <ul className="divide-y divide-slate-100 max-h-[480px] overflow-y-auto">
+                    {attendanceSummary.employees.map((employee, index) => (
+                      <li key={`${employee.employeeCode || employee.name}-${index}`} className="px-5 py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-[#002D72] flex items-center justify-center font-bold text-xs shrink-0">
+                            {index + 1}
                           </div>
-                        </td>
-                      </tr>
+                          <span className="font-semibold text-sm text-slate-900 truncate">{employee.name}</span>
+                        </div>
+                        {employee.employeeCode && (
+                          <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-md shrink-0">
+                            {employee.employeeCode}
+                          </span>
+                        )}
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ATTENDANCE SUB-TAB 3: UNATTENDED BOOKINGS (ORDERED BUT DID NOT CLOCK IN) */}
-          {attSubTab === 'unattended' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-4 p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <XCircle className="w-4 h-4 text-rose-600" />
-                    <span>Danh Sách Đặt Cơm Nhưng Không Quẹt Chấm Công Hôm Nay</span>
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Những suất ăn này đã được bếp chuẩn bị nhưng người đặt chưa có ghi nhận chấm công (nghỉ ốm, công tác đột xuất...). Hành chính GA có thể liên hệ kiểm tra để hủy suất hoặc phân phối lại.
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="p-3.5">Mã Booking</th>
-                      <th className="p-3.5">Mã NV & Họ Tên</th>
-                      <th className="p-3.5">Phòng Ban</th>
-                      <th className="p-3.5">Ca Ăn</th>
-                      <th className="p-3.5">Trạng Thái Suất</th>
-                      <th className="p-3.5 text-right">Cảnh Báo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {(comparison?.unattendedBookings || []).length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">
-                          Không có trường hợp nào đặt cơm mà không đi làm hôm nay.
-                        </td>
-                      </tr>
-                    ) : (
-                      (comparison?.unattendedBookings || []).map((item) => (
-                        <tr key={item.bookingCode} className="hover:bg-slate-50/80 transition">
-                          <td className="p-3.5 font-mono font-bold text-slate-900">{item.bookingCode}</td>
-                          <td className="p-3.5">
-                            <div className="font-bold text-slate-900">{item.name}</div>
-                            <div className="text-[11px] font-mono text-slate-400">{item.employeeCode}</div>
-                          </td>
-                          <td className="p-3.5">
-                            <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-semibold">
-                              {item.departmentName}
-                            </span>
-                          </td>
-                          <td className="p-3.5 font-semibold text-slate-800">{item.shiftName}</td>
-                          <td className="p-3.5">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                              {item.status}
-                            </span>
-                          </td>
-                          <td className="p-3.5 text-right font-medium text-rose-600">
-                            Chưa quẹt thẻ ZKTeco
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ATTENDANCE SUB-TAB 4: SYNC HISTORY */}
-          {attSubTab === 'sync-history' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
-              <h4 className="font-bold text-sm text-slate-900">
-                Nhật Ký Các Lần Đồng Bộ Máy Chấm Công ZKTeco
-              </h4>
-              <div className="space-y-2">
-                {syncRuns.map((run) => (
-                  <div
-                    key={run.id}
-                    className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900">
-                        Đồng bộ lúc: {new Date(run.syncedAt).toLocaleString('vi-VN')}
-                      </div>
-                      <div className="text-slate-500 text-[11px] mt-0.5">
-                        Thực hiện bởi: <strong>{run.triggeredBy}</strong>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-slate-700">
-                        Ghi nhận: <strong>{run.recordsProcessed}</strong> bản ghi chấm công
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        {run.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}

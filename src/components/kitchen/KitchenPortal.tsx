@@ -57,7 +57,7 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
   const [isCreatingMenu, setIsCreatingMenu] = useState(false);
   const [isDishPickerOpen, setIsDishPickerOpen] = useState(false);
   const [newMenuDate, setNewMenuDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [newMenuShiftId, setNewMenuShiftId] = useState<string>('shift_lunch');
+  const [newMenuShiftId, setNewMenuShiftId] = useState<string>('shift_b');
   const [newMenuTitle, setNewMenuTitle] = useState('');
   const [newMenuPrice, setNewMenuPrice] = useState(45000);
   const [newMenuItems, setNewMenuItems] = useState<MenuItem[]>([]);
@@ -138,10 +138,10 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
       setMessage({ type: 'error', text: 'Vui lòng nhập tên tiêu đề thực đơn.' });
       return;
     }
-    if (newMenuItems.length === 0) {
+    if (newMenuItems.length < 2 || newMenuItems.length > 3) {
       setMessage({
         type: 'error',
-        text: 'Vui lòng chọn ít nhất 1 món ăn từ Ngân Hàng Món Ăn Chuẩn Đã Duyệt trước khi lưu!',
+        text: 'Mỗi thực đơn phải có 2 hoặc 3 món ăn đã được GA phê duyệt.',
       });
       return;
     }
@@ -447,7 +447,7 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="font-bold text-xs text-slate-700 block">
-                    Món ăn đính kèm trong thực đơn ({newMenuItems.length} món):
+                    Món ăn trong thực đơn ({newMenuItems.length}/3 món, yêu cầu 2–3):
                   </label>
                   <div className="flex items-center gap-2">
                     <button
@@ -475,7 +475,7 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
                   <div className="p-4 bg-amber-50 rounded-xl border border-dashed border-amber-300 text-center text-xs text-amber-900">
                     <p className="font-bold">Chưa có món nào được chọn cho thực đơn này.</p>
                     <p className="text-amber-700 mt-0.5">
-                      Bấm vào nút <strong>"Chọn Từ Ngân Hàng Món Chuẩn"</strong> phía trên để thêm các món đã được Ban Hành Chính (GA) phê duyệt!
+                      Bấm <strong>"Chọn Từ Ngân Hàng Món Chuẩn"</strong> và chọn 2 hoặc 3 món đã được GA phê duyệt.
                     </p>
                   </div>
                 ) : (
@@ -889,6 +889,8 @@ export function KitchenPortal({ currentUser, onRefreshGlobal, initialSubTab = 'p
               masterDishes={masterDishes}
               onRefresh={loadAll}
               isPickerMode={true}
+              minSelection={2}
+              maxSelection={3}
               initialSelectedIds={newMenuItems.map((d) => d.id)}
               onConfirmSelection={(selectedDishes) => {
                 setNewMenuItems(selectedDishes);

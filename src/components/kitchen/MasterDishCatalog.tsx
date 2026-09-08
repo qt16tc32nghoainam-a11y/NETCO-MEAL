@@ -24,6 +24,8 @@ interface MasterDishCatalogProps {
   masterDishes: MenuItem[];
   onRefresh: () => void;
   isPickerMode?: boolean;
+  minSelection?: number;
+  maxSelection?: number;
   initialSelectedIds?: string[];
   onConfirmSelection?: (selected: MenuItem[]) => void;
   onClosePicker?: () => void;
@@ -72,6 +74,8 @@ export function MasterDishCatalog({
   masterDishes,
   onRefresh,
   isPickerMode = false,
+  minSelection = 0,
+  maxSelection = Number.POSITIVE_INFINITY,
   initialSelectedIds = [],
   onConfirmSelection,
   onClosePicker,
@@ -179,14 +183,33 @@ export function MasterDishCatalog({
 
   // Toggle Picker Selection
   const togglePickerItem = (dish: MenuItem) => {
-    setPickerSelectedIds((prev) =>
-      prev.includes(dish.id) ? prev.filter((id) => id !== dish.id) : [...prev, dish.id]
-    );
+    setPickerSelectedIds((prev) => {
+      if (prev.includes(dish.id)) {
+        setActionMessage(null);
+        return prev.filter((id) => id !== dish.id);
+      }
+      if (prev.length >= maxSelection) {
+        setActionMessage({
+          type: 'error',
+          text: `Mỗi thực đơn chỉ được chọn tối đa ${maxSelection} món.`,
+        });
+        return prev;
+      }
+      setActionMessage(null);
+      return [...prev, dish.id];
+    });
   };
 
   // Confirm Picker
   const handleConfirmPicker = () => {
     if (!onConfirmSelection) return;
+    if (pickerSelectedIds.length < minSelection || pickerSelectedIds.length > maxSelection) {
+      setActionMessage({
+        type: 'error',
+        text: `Vui lòng chọn từ ${minSelection} đến ${maxSelection} món cho thực đơn.`,
+      });
+      return;
+    }
     const selectedObjects = masterDishes.filter((d) => pickerSelectedIds.includes(d.id));
     onConfirmSelection(selectedObjects);
   };
@@ -260,7 +283,7 @@ export function MasterDishCatalog({
               className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
             >
               <Check className="w-4 h-4" />
-              <span>Xong ({pickerSelectedIds.length} món)</span>
+              <span>Xong ({pickerSelectedIds.length}/{Number.isFinite(maxSelection) ? maxSelection : '∞'} món)</span>
             </button>
           )}
         </div>
@@ -348,7 +371,7 @@ export function MasterDishCatalog({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span className="text-emerald-950 font-bold">
-              Đã chọn {pickerSelectedIds.length} món cho thực đơn này:
+              Chọn từ {minSelection} đến {Number.isFinite(maxSelection) ? maxSelection : 'nhiều'} món cho thực đơn này. Đã chọn {pickerSelectedIds.length}:
             </span>
             <span className="text-emerald-800">
               {masterDishes
@@ -362,12 +385,15 @@ export function MasterDishCatalog({
               type="button"
               onClick={() =>
                 setPickerSelectedIds(
-                  masterDishes.filter((d) => (d.status || 'APPROVED') === 'APPROVED').map((d) => d.id)
+                  masterDishes
+                    .filter((d) => (d.status || 'APPROVED') === 'APPROVED')
+                    .slice(0, Number.isFinite(maxSelection) ? maxSelection : undefined)
+                    .map((d) => d.id)
                 )
               }
               className="text-emerald-800 font-bold hover:underline cursor-pointer"
             >
-              Chọn tất cả món đã duyệt
+              Chọn tối đa {Number.isFinite(maxSelection) ? maxSelection : 'tất cả'} món đã duyệt
             </button>
             <span className="text-slate-300">|</span>
             <button

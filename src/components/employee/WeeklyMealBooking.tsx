@@ -85,8 +85,8 @@ export function WeeklyMealBooking({
 
   // Initialize day configurations when workdays or menus change
   useEffect(() => {
-    const defaultShift = shifts.find((s) => s.id === 'shift_lunch') || shifts[0];
-    const defaultShiftId = defaultShift ? defaultShift.id : 'shift_lunch';
+    const defaultShift = shifts.find((s) => s.id === 'shift_b') || shifts[0];
+    const defaultShiftId = defaultShift ? defaultShift.id : 'shift_b';
 
     const configs: DayOption[] = workdays.map((w) => {
       // Find published menu for this date
