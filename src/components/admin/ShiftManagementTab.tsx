@@ -233,6 +233,15 @@ export function ShiftManagementTab({ currentUser, onRefreshGlobal }: ShiftManage
 
   return (
     <div className="space-y-6">
+      {/* Info Banner: ai được quản lý ca */}
+      <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 text-sm text-indigo-900 flex items-start gap-2.5">
+        <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+        <span>
+          <strong>Hành chính (GA)</strong> tạo ca ăn theo nhu cầu vận hành, không giới hạn số lượng ca.
+          Quản trị viên và Hành chính (GA) đều có quyền thêm, sửa, tạm ngưng hoặc xóa ca ăn.
+        </span>
+      </div>
+
       {/* Alert Banner */}
       {message && (
         <div

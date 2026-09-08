@@ -47,6 +47,9 @@ export interface User {
   employeeCode: string;
   name: string;
   email: string;
+  // Mật khẩu chỉ dùng nội bộ ở backend (bản demo in-memory). KHÔNG BAO GIỜ trả về
+  // trường này trong các response API (được loại bỏ trước khi gửi cho client).
+  password?: string;
   role: UserRole;
   departmentId: string;
   departmentName?: string;

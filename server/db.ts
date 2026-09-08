@@ -492,6 +492,14 @@ export const users: User[] = [
   },
 ];
 
+// Gán mật khẩu đăng nhập cho dữ liệu mẫu (bản demo in-memory, lưu plaintext).
+// Quy ước: Quản trị viên đăng nhập bằng tài khoản "admin" / mật khẩu "admin";
+// tất cả người dùng còn lại dùng mật khẩu mặc định chung "123456".
+// Lưu ý: trường password KHÔNG BAO GIỜ được trả về trong response API.
+users.forEach((u) => {
+  u.password = u.role === 'Administrator' ? 'admin' : '123456';
+});
+
 // Shifts Store with strict Cut-off parameters
 // Cố định 3 ca: Ca A (sáng), Ca B (trưa), Ca C (chiều/tối).
 // Việc có thêm ca tăng ca hay không sẽ được quyết định sau.

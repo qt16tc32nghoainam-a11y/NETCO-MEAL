@@ -74,6 +74,13 @@ function sendError(res: Response, code: string, message: string, details?: Recor
   });
 }
 
+// Loại bỏ trường password nhạy cảm trước khi trả về client.
+// Không bao giờ để mật khẩu (dù là bản demo plaintext) lọt ra ngoài response API.
+function sanitizeUser(user: User): User {
+  const { password: _password, ...safe } = user;
+  return safe;
+}
+
 // Helper to extract actor from headers or body
 function getActorUser(req: Request): User {
   const actorId = (req.headers['x-user-id'] as string) || (req.body?.actorUserId as string);
@@ -91,14 +98,24 @@ function getActorUser(req: Request): User {
 apiRouter.post('/auth/login', (req, res) => {
   const { credential, password } = req.body;
   if (!credential) {
-    return sendError(res, 'INVALID_CREDENTIALS', 'Vui lòng cung cấp email hoặc mã nhân viên.');
+    return sendError(res, 'INVALID_CREDENTIALS', 'Vui lòng cung cấp tên đăng nhập, email hoặc mã nhân viên.');
+  }
+  if (!password) {
+    return sendError(res, 'INVALID_CREDENTIALS', 'Vui lòng nhập mật khẩu.');
   }
 
-  const user = users.find(
-    (u) =>
-      u.email.toLowerCase() === credential.toLowerCase() ||
-      u.employeeCode.toUpperCase() === credential.toUpperCase()
-  );
+  const cleanCredential = String(credential).trim();
+
+  // Quản trị viên có thể đăng nhập trực tiếp bằng tên đăng nhập "admin"
+  // (ngoài email/mã nhân viên như các tài khoản khác).
+  const user =
+    cleanCredential.toLowerCase() === 'admin'
+      ? users.find((u) => u.role === 'Administrator')
+      : users.find(
+          (u) =>
+            u.email.toLowerCase() === cleanCredential.toLowerCase() ||
+            u.employeeCode.toUpperCase() === cleanCredential.toUpperCase()
+        );
 
   if (!user) {
     return sendError(res, 'USER_NOT_FOUND', 'Không tìm thấy tài khoản nhân viên tương ứng.');
@@ -106,6 +123,10 @@ apiRouter.post('/auth/login', (req, res) => {
 
   if (user.status === 'LOCKED') {
     return sendError(res, 'ACCOUNT_LOCKED', 'Tài khoản đã bị tạm khóa. Vui lòng liên hệ Administrator.');
+  }
+
+  if (String(password) !== (user.password ?? '')) {
+    return sendError(res, 'INVALID_CREDENTIALS', 'Mật khẩu không chính xác. Vui lòng thử lại.');
   }
 
   // Generate mock JWT tokens
@@ -125,7 +146,7 @@ apiRouter.post('/auth/login', (req, res) => {
   });
 
   return sendSuccess(res, {
-    user,
+    user: sanitizeUser(user),
     accessToken,
     refreshToken,
     expiresIn: 900, // 15 mins
@@ -134,7 +155,7 @@ apiRouter.post('/auth/login', (req, res) => {
 
 apiRouter.get('/users/me', (req, res) => {
   const actor = getActorUser(req);
-  return sendSuccess(res, actor);
+  return sendSuccess(res, sanitizeUser(actor));
 });
 
 apiRouter.get('/users', (req, res) => {
@@ -160,13 +181,13 @@ apiRouter.get('/users', (req, res) => {
     );
   }
 
-  // Ensure departmentName is populated
+  // Ensure departmentName is populated (và loại bỏ trường password nhạy cảm)
   result = result.map((u) => {
     const dept = departments.find((d) => d.id === u.departmentId);
-    return {
+    return sanitizeUser({
       ...u,
       departmentName: u.departmentName || dept?.name || 'Chưa phân bổ',
-    };
+    });
   });
 
   return sendSuccess(res, result);
@@ -196,7 +217,7 @@ apiRouter.get('/users/:id', (req, res) => {
   const confirmedCount = userBookings.filter((b) => b.status === 'CONFIRMED').length;
 
   return sendSuccess(res, {
-    ...user,
+    ...sanitizeUser(user),
     departmentName: user.departmentName || dept?.name || 'Chưa phân bổ',
     roleDetails: userRole || null,
     effectivePermissions,
@@ -270,6 +291,8 @@ apiRouter.post('/users', (req, res) => {
     allergens: Array.isArray(allergens) ? allergens : [],
     dietaryNote,
     joinedDate: getTodayDateString(),
+    // Mật khẩu mặc định cho nhân viên mới (giống các tài khoản thường): "123456".
+    password: role === 'Administrator' ? 'admin' : '123456',
   };
 
   users.push(newUser);
@@ -289,7 +312,7 @@ apiRouter.post('/users', (req, res) => {
     requestId: res.locals.requestId,
   });
 
-  return sendSuccess(res, newUser);
+  return sendSuccess(res, sanitizeUser(newUser));
 });
 
 // Update User (Admin / HR)
@@ -362,7 +385,7 @@ apiRouter.patch('/users/:id', (req, res) => {
     requestId: res.locals.requestId,
   });
 
-  return sendSuccess(res, user);
+  return sendSuccess(res, sanitizeUser(user));
 });
 
 // Self-service User Profile Update
@@ -396,7 +419,7 @@ apiRouter.patch('/users/:id/profile', (req, res) => {
     requestId: res.locals.requestId,
   });
 
-  return sendSuccess(res, user);
+  return sendSuccess(res, sanitizeUser(user));
 });
 
 // Delete or Deactivate User
@@ -750,9 +773,18 @@ apiRouter.get('/shifts', (req, res) => {
   return sendSuccess(res, shiftsWithEligibility);
 });
 
+// Vai trò được phép quản lý ca ăn: Hành chính (HR_GA) tạo ca theo nhu cầu, cùng Quản trị viên.
+// Không giới hạn số lượng ca (ca được tạo linh hoạt theo nhu cầu vận hành).
+const SHIFT_MANAGER_ROLES = ['Administrator', 'HR_GA'];
+const SHIFT_FORBIDDEN_MESSAGE =
+  'Chỉ Hành chính (GA) và Quản trị viên mới được phép quản lý ca ăn.';
+
 // Create Shift (POST /shifts)
 apiRouter.post('/shifts', (req, res) => {
   const actor = getActorUser(req);
+  if (!SHIFT_MANAGER_ROLES.includes(actor.role)) {
+    return sendError(res, 'FORBIDDEN', SHIFT_FORBIDDEN_MESSAGE, {}, 403);
+  }
   const {
     name,
     code,
@@ -813,6 +845,9 @@ apiRouter.post('/shifts', (req, res) => {
 // Update Shift (PATCH /shifts/:id)
 apiRouter.patch('/shifts/:id', (req, res) => {
   const actor = getActorUser(req);
+  if (!SHIFT_MANAGER_ROLES.includes(actor.role)) {
+    return sendError(res, 'FORBIDDEN', SHIFT_FORBIDDEN_MESSAGE, {}, 403);
+  }
   const { id } = req.params;
   const shift = shifts.find((s) => s.id === id);
 
@@ -873,6 +908,9 @@ apiRouter.patch('/shifts/:id', (req, res) => {
 // Delete Shift (DELETE /shifts/:id)
 apiRouter.delete('/shifts/:id', (req, res) => {
   const actor = getActorUser(req);
+  if (!SHIFT_MANAGER_ROLES.includes(actor.role)) {
+    return sendError(res, 'FORBIDDEN', SHIFT_FORBIDDEN_MESSAGE, {}, 403);
+  }
   const { id } = req.params;
   const shiftIndex = shifts.findIndex((s) => s.id === id);
 
