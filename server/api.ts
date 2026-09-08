@@ -2107,7 +2107,10 @@ apiRouter.post('/attendance/emergency-book-bulk', (req, res) => {
         userName: userObj.name,
         userEmployeeCode: userObj.employeeCode,
         departmentId: userObj.departmentId,
-        departmentName: userObj.departmentName,
+        departmentName:
+          userObj.departmentName ||
+          departments.find((d) => d.id === userObj.departmentId)?.name ||
+          'Chưa phân bổ',
         mealDate: targetDate,
         shiftId: targetShiftId,
         shiftName: shift ? shift.name : targetShiftId,
