@@ -42,7 +42,8 @@ npm run start   # node dist/server.cjs — phục vụ dist/ tĩnh + API Express
 
 Trên Vercel, `server.ts` **không** được chạy (Vercel chỉ phục vụ bản build tĩnh của Vite trong thư mục `dist/`). Vì vậy API được đóng gói lại dưới dạng **Serverless Function**:
 
-- API chạy dưới dạng Serverless Function tại `api/index.ts`. File này tạo một app Express tối giản và gắn lại **chính** `apiRouter` từ `server/api.ts` (không nhân bản logic route) tại base `/api/v1`.
+- API chạy dưới dạng Serverless Function tại `api/index.ts`. File này tạo một app Express tối giản và gắn lại **chính** `apiRouter` từ `server/api.ts` (không nhân bản logic route) tại base `/api/v1`. Default export là một handler `(req, res) => app(req, res)` (không export thẳng app Express) để tương thích rộng nhất với runtime `@vercel/node`, kèm middleware bắt lỗi trả JSON để tránh lỗi 500 mờ mịt.
+- `api/tsconfig.json` cấu hình riêng cho function (`module: CommonJS`, `moduleResolution: Node`, `esModuleInterop`) để Vercel biên dịch function sạch sẽ, không kế thừa các thiết lập chỉ dành cho Vite ở tsconfig gốc (`allowImportingTsExtensions`, `noEmit`, `moduleResolution: bundler`) vốn có thể khiến function lỗi lúc chạy.
 - `vercel.json` cấu hình `rewrites`: mọi lời gọi `/api/v1/*` được chuyển tới function `api/index`; các đường dẫn còn lại (không thuộc `api/`) fallback về `index.html` để React SPA (định tuyến phía client, refresh trang) hoạt động.
 - Frontend được build bằng Vite (`vite build`) và phục vụ tĩnh từ `dist/`.
 
