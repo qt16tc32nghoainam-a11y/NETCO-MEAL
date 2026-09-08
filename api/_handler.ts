@@ -2,43 +2,42 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import { apiRouter } from '../server/api';
 
 // ===========================================================================
-// Vercel Serverless Function entrypoint (CommonJS)
+// Vercel Serverless Function SOURCE (bundled to a single CommonJS file)
 // ===========================================================================
 //
-// DEPENDENCIES: We intentionally do NOT add `@vercel/node` as a new dependency.
-// The committed `bun.lock` is written by a newer Bun than the toolchain here
-// and cannot be regenerated offline (INTEGRATIONS_ONLY blocks the registry).
-// Adding an unlocked dependency risks a frozen-lockfile install failure on
-// Vercel, which would be a NEW failure mode. The `@vercel/node` runtime invokes
-// the default export as `handler(req, res)` regardless of its TypeScript types,
-// and an Express app is already a valid `(req, res)` handler, so the express
-// types shipped via `@types/express` are sufficient for a correct runtime.
+// WHY THIS FILE IS PREFIXED WITH `_`:
+// Vercel's zero-config function detection ignores files and directories whose
+// names start with an underscore. This file is therefore NOT compiled by
+// Vercel into a multi-file serverless function. Instead, the project's own
+// `buildCommand` (see vercel.json) runs esbuild to bundle THIS source into a
+// single self-contained CommonJS file at `api/index.js`, and Vercel serves
+// that bundled `.js` as the function.
 //
-// MODULE SYSTEM: This function is compiled as CommonJS (see api/tsconfig.json:
-// "module": "CommonJS"). The rest of the repo runs through Vite/tsx which is
-// ESM, but the serverless function is an ISOLATED build target that @vercel/node
-// compiles on its own using this local tsconfig. We deliberately keep it
-// CommonJS because every relative import in the server chain
-// (../server/api -> ./db -> ../src/types) is EXTENSIONLESS. Node ESM
-// (NodeNext) would require explicit `.js` extensions on all of those imports,
-// which the codebase does not use; forcing ESM would break resolution at
-// invocation time and produce exactly the HTTP 500 we are fixing. CommonJS
-// resolves extensionless relative imports natively, so this is the safe,
-// standard choice.
+// WHY BUNDLING (INSTEAD OF PER-DIRECTORY package.json PATCHING):
+// Previously the function was the raw `api/index.ts`, which Vercel compiled
+// into `api/index.js` while leaving its local imports (`../server/api`, which
+// in turn imports `./db` and `../src/types`) as SEPARATE `.js` files. Those
+// files live OUTSIDE `api/`, so they fall under the ROOT `package.json`
+// (`"type": "module"`) and are treated as ES modules. But `api/index.js` is
+// CommonJS (via `api/package.json` = `{"type":"commonjs"}`), so at runtime it
+// did `require('../server/api.js')` against an ESM file and Node threw
+// `ERR_REQUIRE_ESM`. Patching each directory with its own package.json is
+// whack-a-mole (server/, then src/, then any transitive file).
 //
-// ROUTING: On Vercel, `vercel.json` rewrites `/api/v1/(.*)` to this function.
-// Depending on the runtime, the request path seen inside the function may or
-// may not still include the `/api/v1` prefix. To be robust to BOTH cases we
-// mount `apiRouter` at `/api/v1` AND at `/`, so a request for `/auth/login`
-// (prefix stripped) and `/api/v1/auth/login` (prefix preserved) both reach the
-// router's `/auth/login` handler. This removes the most common cause of a
-// silent 404/500 mismatch.
+// The robust fix: esbuild bundles ALL local project code (server/api.ts,
+// server/db.ts, src/types.ts) INLINE into one CommonJS module. There is then
+// NO runtime `require()` of any other project `.js` file, so the ESM/CJS
+// boundary that produced `ERR_REQUIRE_ESM` cannot exist. `node_modules`
+// packages (express, etc.) are kept EXTERNAL (`--packages=external`) because
+// Vercel installs them, and CommonJS `require('express')` resolves them fine.
 //
-// SAFETY: The entire import chain is in-memory only. There is no top-level
-// `await`, no filesystem read, no `process.exit`, and no throw at module load,
-// so importing this module cannot crash the function cold start. Static assets
-// (the Vite `dist/` build) are served by Vercel directly and are NOT the
-// responsibility of this function.
+// ROUTING: `vercel.json` rewrites `/api/v1/(.*)` to this function. Depending
+// on the runtime, the path seen inside the function may or may not still carry
+// the `/api/v1` prefix, so we mount `apiRouter` at BOTH `/api/v1` and `/`.
+//
+// SAFETY: The entire import chain is in-memory only. No top-level await, no
+// filesystem read at import, no `process.exit`, no throw at module load, so
+// importing this module cannot crash the function cold start.
 
 const app = express();
 
@@ -89,10 +88,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 // Export a handler in the canonical @vercel/node shape. The runtime always
 // invokes the default export as `handler(req, res)`. An Express app IS a
-// `(req, res)` handler, so we simply delegate to it. Wrapping it in a named
-// function (rather than exporting the raw `app`) is the most broadly compatible
-// form across @vercel/node runtime versions and avoids interop edge cases where
-// a raw Express `app` default export is not recognised/invoked correctly.
+// `(req, res)` handler, so we simply delegate to it.
 export default function handler(req: Request, res: Response) {
   return app(req, res);
 }

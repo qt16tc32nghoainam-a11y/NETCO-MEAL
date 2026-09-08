@@ -2,6 +2,11 @@ node_modules/
 build/
 dist/
 coverage/
+
+# Vercel-built serverless function bundle (produced from api/_handler.ts by the
+# vercel.json buildCommand at deploy time; must NOT be committed).
+api/index.js
+api/index.js.map
 .DS_Store
 *.log
 .env*
