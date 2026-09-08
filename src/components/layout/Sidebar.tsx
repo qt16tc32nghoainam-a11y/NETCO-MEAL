@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ComponentType } from 'react';
 import {
   UtensilsCrossed,
   ChefHat,
@@ -122,7 +123,19 @@ export function Sidebar({
   const badge = getRoleBadge(currentUser.role);
 
   // Grouped Navigation Items with CRUD labels (All aligned on the left as requested)
-  const navSections = [
+  interface NavItem {
+    id: string;
+    label: string;
+    desc: string;
+    icon: ComponentType<{ className?: string }>;
+    crud: boolean;
+    badgeText?: string;
+  }
+  interface NavSection {
+    group: string;
+    items: NavItem[];
+  }
+  const navSections: NavSection[] = [
     {
       group: 'DỊCH VỤ SUẤT ĂN NETCO',
       items: [
