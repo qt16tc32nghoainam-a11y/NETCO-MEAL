@@ -163,9 +163,9 @@ export const systemPermissions: PermissionDefinition[] = [
   },
   {
     id: 'HR_RECONCILIATION',
-    name: 'Đối soát máy chấm công & Suất ăn',
+    name: 'Đối soát chấm công (hệ thống độc lập) & Suất ăn',
     category: 'Nhân sự & Báo cáo',
-    description: 'So sánh dữ liệu quẹt thẻ chấm công với số suất ăn đã đăng ký và check-in thực tế',
+    description: 'So sánh dữ liệu chấm công lấy từ hệ thống chấm công độc lập bên ngoài với số suất ăn đã đăng ký và check-in thực tế',
   },
   {
     id: 'HR_EXPENSE_REPORTS',
@@ -848,7 +848,10 @@ export const bookings: Booking[] = [
   },
 ];
 
-// Seed Attendance Records (Máy chấm công)
+// Seed dữ liệu chấm công hôm nay - MÔ PHỎNG phản hồi từ HỆ THỐNG CHẤM CÔNG ĐỘC LẬP BÊN NGOÀI.
+// Đây KHÔNG phải dữ liệu chấm công do ứng dụng này ghi nhận. Ứng dụng chỉ GỌI API bên ngoài
+// để lấy số lượng chấm công hôm nay và danh sách tên nhân viên đã chấm công.
+// (machineId/deviceId chỉ là thông tin nguồn thiết bị tùy chọn do hệ thống bên ngoài trả về.)
 export const attendanceRecords: AttendanceRecord[] = [
   {
     id: 'att_001',
@@ -902,17 +905,18 @@ export const attendanceRecords: AttendanceRecord[] = [
   },
 ];
 
-// Attendance Sync Runs Store
+// Lịch sử các lần LẤY dữ liệu chấm công hôm nay từ HỆ THỐNG CHẤM CÔNG ĐỘC LẬP BÊN NGOÀI.
+// Mỗi bản ghi chỉ ghi lại kết quả lần gọi API lấy dữ liệu, KHÔNG tạo/ghi nhận chấm công trong ứng dụng.
 export const attendanceSyncRuns: AttendanceSyncRun[] = [
   {
     id: 'sync_run_01',
     syncedAt: `${today}T09:00:00.000Z`,
     totalProcessed: 5,
     matchedEmployees: 5,
-    discrepancyCount: 1, // Ngô Việt Đức đi làm nhưng chưa đặt cơm trưa!
+    discrepancyCount: 1, // Ngô Việt Đức đã chấm công nhưng chưa đặt cơm trưa!
     status: 'SUCCESS',
     triggeredBy: 'Automated Cron Job (09:00 UTC+7)',
-    notes: 'Đồng bộ từ máy chấm công ZKTeco qua REST API Adapter thành công.',
+    notes: 'Lấy dữ liệu chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài thành công qua REST API.',
   },
 ];
 

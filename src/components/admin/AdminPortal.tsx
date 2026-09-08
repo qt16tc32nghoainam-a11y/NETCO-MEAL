@@ -257,8 +257,8 @@ export function AdminPortal({ currentUser, onRefreshGlobal, initialTab = 'users'
                   className="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500"
                 />
                 <div>
-                  <div className="font-bold text-slate-800">Tự động đồng bộ máy chấm công định kỳ (Cronjob)</div>
-                  <div className="text-slate-500">Chạy định kỳ vào 09:30 và 14:00 hàng ngày đối soát nhân sự đi làm.</div>
+                  <div className="font-bold text-slate-800">Tự động lấy dữ liệu từ hệ thống chấm công độc lập định kỳ (Cronjob)</div>
+                  <div className="text-slate-500">Chạy định kỳ vào 09:30 và 14:00 hàng ngày để lấy dữ liệu chấm công từ hệ thống độc lập bên ngoài và đối soát nhân sự đi làm.</div>
                 </div>
               </label>
 

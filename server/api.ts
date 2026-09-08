@@ -1778,24 +1778,31 @@ apiRouter.delete('/bookings/:id', (req, res) => {
 // 5. ATTENDANCE INTEGRATION & COMPARISON
 // ==========================================
 
+// LẤY dữ liệu chấm công hôm nay TỪ hệ thống chấm công ĐỘC LẬP BÊN NGOÀI.
+// Endpoint này CHỈ ĐỌC (pull) số lượng + danh sách nhân viên đã chấm công từ hệ thống ngoài;
+// KHÔNG tạo/ghi nhận bất kỳ lượt chấm công nào trong ứng dụng. Giữ nguyên path để tương thích frontend.
 apiRouter.post('/attendance/sync', (req, res) => {
   const actor = getActorUser(req);
   if (!systemSettings.isAttendanceSyncEnabled) {
-    return sendError(res, 'SYNC_DISABLED', 'Tính năng đồng bộ máy chấm công hiện đang tắt trong Cấu hình hệ thống.');
+    return sendError(res, 'SYNC_DISABLED', 'Tính năng đối soát với hệ thống chấm công độc lập hiện đang tắt trong Cấu hình hệ thống.');
   }
 
   const todayStr = getTodayDateString();
 
-  // Create sync run
+  // Đọc dữ liệu chấm công hôm nay từ hệ thống bên ngoài (ở đây dùng mock attendanceRecords)
+  const externalToday = attendanceRecords.filter((a) => a.date === todayStr);
+  const totalFetched = externalToday.length || attendanceRecords.length;
+
+  // Ghi lại kết quả lần LẤY dữ liệu (fetch run), không phải lượt chấm công mới
   const newSyncRun = {
     id: generateId('sync'),
     syncedAt: new Date().toISOString(),
-    totalProcessed: attendanceRecords.length,
-    matchedEmployees: attendanceRecords.length,
+    totalProcessed: totalFetched,
+    matchedEmployees: totalFetched,
     discrepancyCount: 1, // Demo disparity
     status: 'SUCCESS' as const,
     triggeredBy: `${actor.name} (${actor.role})`,
-    notes: 'Đồng bộ trực tiếp thành công từ máy chấm công vân tay & khuôn mặt ZKTeco FacePass.',
+    notes: 'Lấy số lượng & danh sách nhân viên chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài thành công qua REST API.',
   };
 
   attendanceSyncRuns.unshift(newSyncRun);
@@ -1803,16 +1810,35 @@ apiRouter.post('/attendance/sync', (req, res) => {
   addAuditLog({
     actorUserId: actor.id,
     actorName: actor.name,
-    action: 'ATTENDANCE_SYNC',
+    action: 'ATTENDANCE_FETCH_EXTERNAL',
     resourceType: 'ATTENDANCE',
     resourceId: newSyncRun.id,
-    newValue: `Thực hiện đồng bộ dữ liệu chấm công: ${newSyncRun.totalProcessed} bản ghi`,
+    newValue: `Lấy dữ liệu chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài: ${newSyncRun.totalProcessed} nhân viên đã chấm công`,
     ipAddress: req.ip || '127.0.0.1',
     userAgent: req.headers['user-agent'] || 'Unknown',
     requestId: res.locals.requestId,
   });
 
   return sendSuccess(res, newSyncRun);
+});
+
+// GET dữ liệu chấm công hôm nay từ hệ thống chấm công độc lập bên ngoài (chỉ đọc):
+// trả về số lượng và danh sách nhân viên đã chấm công (mã, tên, phòng ban, giờ chấm công).
+apiRouter.get('/attendance/external-today', (req, res) => {
+  const targetDate = (req.query.date as string) || getTodayDateString();
+  const externalToday = attendanceRecords.filter((a) => a.date === targetDate);
+
+  return sendSuccess(res, {
+    source: 'Hệ thống chấm công độc lập bên ngoài (external attendance API)',
+    date: targetDate,
+    totalCount: externalToday.length,
+    employees: externalToday.map((a) => ({
+      employeeCode: a.employeeCode,
+      employeeName: a.employeeName,
+      departmentName: a.departmentName,
+      checkInTime: a.checkInTime,
+    })),
+  });
 });
 
 apiRouter.get('/attendance/comparison', (req, res) => {
@@ -2016,7 +2042,7 @@ apiRouter.post('/attendance/emergency-book-bulk', (req, res) => {
         selectedItemNames: menu?.items.map((i) => i.name) || [],
         status: 'CONFIRMED',
         isGuest: false,
-        note: `Hành chính GA đặt bổ sung khẩn cấp theo dữ liệu máy chấm công ZKTeco`,
+        note: `Hành chính GA đặt bổ sung khẩn cấp theo dữ liệu từ hệ thống chấm công độc lập bên ngoài`,
         priceSnapshot: menu ? menu.price : 45000,
         bookedAt: new Date().toISOString(),
         bookedByUserId: actor.id,
