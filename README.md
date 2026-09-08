@@ -51,6 +51,32 @@ Trên Vercel, `server.ts` **không** được chạy (Vercel chỉ phục vụ b
 
 Lưu ý: script `npm run build` trong `package.json` vẫn giữ nguyên (build frontend + đóng gói `server.ts` bằng esbuild) để phục vụ chạy standalone/local (`npm run start`) và các nền tảng khác. Vercel chỉ dùng `buildCommand` là `vite build` khai báo trong `vercel.json`.
 
+## Triển khai trên Render
+
+Render chạy một **máy chủ Node lâu dài** (long-lived), đúng như thiết kế gốc của `server.ts`: một tiến trình Express duy nhất vừa phục vụ frontend đã build trong `dist/`, vừa phục vụ API tại `/api/v1`. Đây là mô hình phù hợp nhất cho ứng dụng này (khác với Vercel serverless).
+
+Có hai cách triển khai:
+
+**Cách 1 — Dùng Blueprint `render.yaml` (khuyến nghị):**
+
+Repo đã có sẵn file `render.yaml` ở thư mục gốc khai báo một **Web Service** với cấu hình chuẩn. Trên [Render Dashboard](https://dashboard.render.com/), chọn **New → Blueprint**, kết nối tới repo GitHub này, Render sẽ tự đọc `render.yaml` và tạo dịch vụ.
+
+**Cách 2 — Tạo Web Service thủ công:**
+
+Trên Render Dashboard chọn **New → Web Service**, kết nối repo GitHub, rồi khai báo:
+
+- **Runtime:** Node
+- **Build Command:** `npm install && npm run build`
+- **Start Command:** `npm run start`
+- **Environment Variable:** `NODE_ENV=production` (để server chạy nhánh phục vụ file tĩnh `dist/`, không chạy nhánh Vite dev).
+
+Vài điểm quan trọng:
+
+- **Cổng (PORT):** Render **tự động gán** cổng qua biến môi trường `PORT` và yêu cầu server lắng nghe trên cổng đó (bind `0.0.0.0`). `server.ts` đã đọc `const PORT = Number(process.env.PORT) || 3000;` nên tự dùng đúng cổng Render cung cấp — **không cần** (và không nên) tự đặt cứng cổng. Nếu để cứng `3000`, health check của Render sẽ báo "No open ports detected".
+- **Build:** `npm install` trên Render cài **cả `dependencies` lẫn `devDependencies`** (mặc định), nên các công cụ build (`vite`, `esbuild`, `tsx`, `typescript`) đều có mặt để `npm run build` chạy được. `npm run build` tạo ra `dist/` (Vite) và `dist/server.cjs` (esbuild); `npm run start` chạy `node dist/server.cjs`.
+
+> ⚠️ **Cảnh báo quan trọng về dữ liệu:** dữ liệu hiện được lưu **in-memory** trong `server/db.ts`. Trên Render, dữ liệu sẽ **reset về seed ban đầu mỗi khi dịch vụ khởi động lại hoặc redeploy** (và gói free có thể tự ngủ khi không có lưu lượng, khởi động lại khi có request mới). Đăng nhập và dữ liệu seed luôn hoạt động, nhưng mọi thay đổi lúc chạy (đặt cơm, tạo thực đơn, v.v.) sẽ **mất** sau khi khởi động lại. Muốn dùng thật (production), cần thay kho in-memory bằng một **cơ sở dữ liệu thực** (ví dụ PostgreSQL trên Render).
+
 ## Thông tin đăng nhập demo
 
 - **Quản trị viên:** tên đăng nhập `admin` / mật khẩu `admin`.
